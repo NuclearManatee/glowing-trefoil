@@ -1,2 +1,4 @@
 node_modules/
 local/
+settings.local.json
+CLAUDE.local.md
