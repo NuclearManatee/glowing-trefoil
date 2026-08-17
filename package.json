@@ -1,0 +1,22 @@
+{
+	"name": "script-forge-plugin",
+	"private": true,
+	"type": "module",
+	"engines": {
+		"bun": "1.3.14"
+	},
+	"scripts": {
+		"lint": "eslint -c eslint.tooling.js commands/scripts/**/*.ts",
+		"typecheck": "tsc --noEmit"
+	},
+	"devDependencies": {
+		"@stylistic/eslint-plugin": "^5.10.0",
+		"@types/bun": "^1.3.14",
+		"@typescript-eslint/eslint-plugin": "^8.67.0",
+		"@typescript-eslint/parser": "^8.67.0",
+		"eslint": "^10.8.1",
+		"eslint-plugin-unicorn": "^65.0.1",
+		"typescript": "^6.0.3",
+		"zod": "^4.4.3"
+	}
+}

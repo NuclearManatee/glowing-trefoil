@@ -1,0 +1,6 @@
+node_modules/
+.env
+{{localDir}}/tmp/*
+{{localDir}}/raw_data/*
+!{{localDir}}/tmp/.gitkeep
+!{{localDir}}/raw_data/.gitkeep
