@@ -38,7 +38,7 @@ scaffolded project without copying anything.
 
 ```sh
 # marketplace install
-/plugin marketplace add <this repo>
+/plugin marketplace add https://github.com/NuclearManatee/script-forge.git
 
 # or manual: point Claude Code at the plugin directory
 claude --plugin-dir /path/to/script-forge
