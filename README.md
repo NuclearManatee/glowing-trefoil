@@ -31,20 +31,24 @@ by `.gitkeep` files — renamed and rewired at scaffold time to the configured
 
 ## Install once, use in every project
 
-The plugin is installed once per machine; every project it scaffolds **points**
-at the plugin's eslint config by absolute path. The config's imports resolve
-from the plugin install's own `node_modules` — that is why lint works in any
-scaffolded project without copying anything.
+The plugin is installed once per machine (user scope — available in every
+project); every project it scaffolds **points** at the plugin's eslint config
+by absolute path. The config's imports resolve from the plugin install's own
+`node_modules` — that is why lint works in any scaffolded project without
+copying anything.
 
 ```sh
-# marketplace install
+# two steps: register the marketplace, then install the plugin (user scope by default)
 /plugin marketplace add https://github.com/NuclearManatee/script-forge.git
+/plugin install script-forge@script-forge
 
 # or manual: point Claude Code at the plugin directory
 claude --plugin-dir /path/to/script-forge
 ```
 
-Then, once per new project: `/script-forge:scaffold`.
+`/plugin install` defaults to user scope — once per machine, enabled in all
+projects. If the install summary says so, run `/reload-plugins` (or restart)
+to activate. Then, once per new project: `/script-forge:scaffold`.
 
 ## Configuration
 
