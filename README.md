@@ -52,7 +52,8 @@ to activate. Then, once per new project: `/script-forge:scaffold`.
 
 ## Configuration
 
-Plugin-level `userConfig` (set in Claude Code settings):
+Plugin-level `userConfig` (set in Claude Code settings; the plugin is fully
+functional with defaults — you're never forced through the config dialog):
 
 - `defaultNamespace` (default `tools`) — the `<namespace>:<scriptname>` alias namespace anvil uses.
 - `scaffoldDirectory` (default: the current working directory) — absolute path where `/script-forge:scaffold` creates new workspaces.
@@ -60,6 +61,28 @@ Plugin-level `userConfig` (set in Claude Code settings):
 - `localDirectory` (default `local`) — the workspace scratch root (`tmp/` and `raw_data/` hang off it).
 - `esLintConfigLocation` (default: the plugin's `eslint.tooling.js`, absolute path, forward slashes) — the ESLint config scaffold and lint point at via `--config`. A custom config resolves its imports relative to its own location.
 - LLM provider & model for prompt files: **asked at runtime** — when anvil creates a prompt file it asks the user, presenting the current default model per provider (looked up at ask time); there is no config default.
+
+Claude Code prompts for `userConfig` when the plugin is enabled; with defaults
+everywhere the dialog is skippable, and the CLI install form never asks. To set
+values after install, add a `pluginConfigs` entry to your **user** settings
+(`~/.claude/settings.json` — project and local settings are ignored), then run
+`/reload-plugins` (or restart):
+
+```json
+{
+  "pluginConfigs": {
+    "script-forge@script-forge": {
+      "options": {
+        "defaultNamespace": "tools",
+        "esLintConfigLocation": ""
+      }
+    }
+  }
+}
+```
+
+The plugin id is `script-forge@script-forge` (plugin name + marketplace name);
+`options` keys are the `userConfig` names above.
 
 ## Workspace shape
 
