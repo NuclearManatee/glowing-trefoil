@@ -1,0 +1,14 @@
+{
+	"name": "script-forge",
+	"description": "Script Forge rulebook as a plugin: the anvil skill builds tooling scripts per the rulebook; scaffold/doctor/lint commands manage every Script Forge workspace.",
+	"owner": {
+		"name": "NuclearManatee"
+	},
+	"plugins": [
+		{
+			"name": "script-forge",
+			"source": "./",
+			"description": "Script Forge rulebook as a plugin: the anvil skill builds tooling scripts per the rulebook; scaffold/doctor/lint commands manage every Script Forge workspace."
+		}
+	]
+}
