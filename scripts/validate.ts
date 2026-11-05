@@ -1,0 +1,307 @@
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { COMMAND_NAMES } from "../plugins/script-forge/lib/commands.ts";
+
+const FORBIDDEN_PORTABLE_STRINGS = ["${user_config", "${CLAUDE_PLUGIN_ROOT}", "AskUserQuestion", "Claude Code tools"];
+const POSIX_SHELL_PATTERNS = [/\bcp\s+-r\b/, /\bmkdir\s+-p\b/, /\bmv\s+/, /\bcd\s+[^\n]+\s+&&/];
+
+export type ValidationResult = {
+	passes: number;
+	failures: number;
+	lines: string[];
+};
+
+function recordPass(result: ValidationResult, message: string): void {
+	result.passes += 1;
+	result.lines.push(`[PASS] ${message}`);
+}
+
+function recordFailure(result: ValidationResult, message: string): void {
+	result.failures += 1;
+	result.lines.push(`[FAIL] ${message}`);
+}
+
+function check(result: ValidationResult, condition: boolean, message: string): void {
+	if (condition) {
+		recordPass(result, message);
+	} else {
+		recordFailure(result, message);
+	}
+}
+
+function readText(path: string): string {
+	return readFileSync(path, "utf8");
+}
+
+function readJson(path: string): unknown {
+	return JSON.parse(readText(path)) as unknown;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+	if (typeof value !== "object" || value === null || Array.isArray(value)) {
+		return null;
+	}
+	return value as Record<string, unknown>;
+}
+
+function stringValue(record: Record<string, unknown>, key: string): string | undefined {
+	const value = record[key];
+	return typeof value === "string" ? value : undefined;
+}
+
+function frontmatter(raw: string): Record<string, string> {
+	const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/);
+	if (match === null || match[1] === undefined) {
+		return {};
+	}
+	const fields: Record<string, string> = {};
+	for (const line of match[1].split(/\r?\n/)) {
+		const separator = line.indexOf(":");
+		if (separator === -1) {
+			continue;
+		}
+		const key = line.slice(0, separator).trim();
+		let value = line.slice(separator + 1).trim();
+		if ((value.startsWith("\"") && value.endsWith("\"")) || (value.startsWith("'") && value.endsWith("'"))) {
+			value = value.slice(1, -1);
+		}
+		fields[key] = value;
+	}
+	return fields;
+}
+
+function checkForbiddenStrings(result: ValidationResult, path: string, label: string): void {
+	const content = readText(path);
+	for (const forbidden of FORBIDDEN_PORTABLE_STRINGS) {
+		check(result, !content.includes(forbidden), `${label} does not contain "${forbidden}"`);
+	}
+}
+
+function checkMarketplace(result: ValidationResult, root: string, path: string, expectedName: string): void {
+	if (!existsSync(path)) {
+		recordFailure(result, `${expectedName} marketplace manifest missing: ${path}`);
+		return;
+	}
+	const parsed = asRecord(readJson(path));
+	if (parsed === null) {
+		recordFailure(result, `${expectedName} marketplace manifest is not an object`);
+		return;
+	}
+	check(result, stringValue(parsed, "name") === expectedName, `${expectedName} marketplace name is "${expectedName}"`);
+	const { plugins } = parsed;
+	if (!Array.isArray(plugins) || plugins.length === 0) {
+		recordFailure(result, `${expectedName} marketplace has no plugins`);
+		return;
+	}
+	for (const entry of plugins) {
+		const record = asRecord(entry);
+		if (record === null) {
+			recordFailure(result, `${expectedName} marketplace has a malformed plugin entry`);
+			continue;
+		}
+		const { source } = record;
+		if (typeof source === "string") {
+			check(result, existsSync(resolve(root, source)), `${expectedName} marketplace source exists: ${source}`);
+		} else if (typeof source === "object" && source !== null) {
+			const sourceRecord = asRecord(source);
+			const sourcePath = sourceRecord === null ? undefined : stringValue(sourceRecord, "path");
+			check(
+				result,
+				sourcePath !== undefined && existsSync(resolve(root, sourcePath)),
+				`${expectedName} marketplace source path exists`,
+			);
+		} else {
+			recordFailure(result, `${expectedName} marketplace entry has no source`);
+		}
+	}
+}
+
+function checkReferenceFiles(result: ValidationResult, pluginDir: string, pluginName: string): void {
+	const skillsRoot = join(pluginDir, "skills");
+	if (!existsSync(skillsRoot)) {
+		return;
+	}
+	for (const skill of readdirSync(skillsRoot, { withFileTypes: true })) {
+		if (!skill.isDirectory()) {
+			continue;
+		}
+		const references = join(skillsRoot, skill.name, "references");
+		if (!existsSync(references)) {
+			continue;
+		}
+		for (const file of readdirSync(references)) {
+			if (!file.endsWith(".md")) {
+				continue;
+			}
+			checkForbiddenStrings(result, join(references, file), `${pluginName}: skill ${skill.name}/references/${file}`);
+		}
+	}
+}
+
+function checkPlugin(result: ValidationResult, pluginDir: string, pluginName: string, version: string): void {
+	const claudeManifestPath = join(pluginDir, ".claude-plugin", "plugin.json");
+	const cursorManifestPath = join(pluginDir, ".cursor-plugin", "plugin.json");
+
+	for (const [label, path] of [
+		["Claude", claudeManifestPath],
+		["Cursor", cursorManifestPath],
+	] as const) {
+		if (!existsSync(path)) {
+			recordFailure(result, `${pluginName}: ${label} manifest missing`);
+			continue;
+		}
+		const manifest = asRecord(readJson(path));
+		if (manifest === null) {
+			recordFailure(result, `${pluginName}: ${label} manifest is not an object`);
+			continue;
+		}
+		check(result, stringValue(manifest, "name") === pluginName, `${pluginName}: ${label} manifest name matches`);
+		check(result, stringValue(manifest, "version") === version, `${pluginName}: ${label} version is ${version}`);
+	}
+
+	check(result, !existsSync(join(pluginDir, "bin")), `${pluginName}: no top-level bin/ directory`);
+	check(result, !existsSync(join(pluginDir, "package.json")), `${pluginName}: no plugin package.json`);
+
+	for (const directory of ["commands", "commands-cursor", "commands-opencode", "skills", "assets", "templates"]) {
+		check(result, existsSync(join(pluginDir, directory)), `${pluginName}: ${directory}/ exists`);
+	}
+
+	const skillsRoot = join(pluginDir, "skills");
+	if (existsSync(skillsRoot)) {
+		for (const entry of readdirSync(skillsRoot, { withFileTypes: true })) {
+			if (!entry.isDirectory()) {
+				continue;
+			}
+			const skillPath = join(skillsRoot, entry.name, "SKILL.md");
+			if (!existsSync(skillPath)) {
+				recordFailure(result, `${pluginName}: skill ${entry.name} has no SKILL.md`);
+				continue;
+			}
+			const fields = frontmatter(readText(skillPath));
+			check(result, fields.name === entry.name, `${pluginName}: skill ${entry.name} frontmatter name matches`);
+			const description = fields.description ?? "";
+			check(
+				result,
+				description.length > 0 && description.length <= 1024,
+				`${pluginName}: skill ${entry.name} description is 1-1024 chars`,
+			);
+			checkForbiddenStrings(result, skillPath, `${pluginName}: skill ${entry.name}`);
+		}
+	}
+
+	const rulebookPath = join(pluginDir, "assets", "script-forge.md");
+	if (existsSync(rulebookPath)) {
+		checkForbiddenStrings(result, rulebookPath, `${pluginName}: rulebook`);
+	}
+	checkReferenceFiles(result, pluginDir, pluginName);
+
+	for (const commandName of COMMAND_NAMES) {
+		const claudePath = join(pluginDir, "commands", `${commandName}.md`);
+		const cursorPath = join(pluginDir, "commands-cursor", `${commandName}.md`);
+		const openCodePath = join(pluginDir, "commands-opencode", `script-forge-${commandName}.md`);
+		check(result, existsSync(claudePath), `${pluginName}: generated Claude command ${commandName}`);
+		check(result, existsSync(cursorPath), `${pluginName}: generated Cursor command ${commandName}`);
+		check(result, existsSync(openCodePath), `${pluginName}: generated OpenCode command ${commandName}`);
+		if (existsSync(claudePath)) {
+			check(
+				result,
+				readText(claudePath).includes("allowed-tools: Bash(npx:*)"),
+				`${pluginName}: Claude command ${commandName} uses npx`,
+			);
+		}
+		for (const path of [cursorPath, openCodePath]) {
+			if (existsSync(path)) {
+				check(result, !readText(path).includes("${user_config"), `${pluginName}: ${path} has no Claude-only config`);
+			}
+		}
+	}
+}
+
+function checkSources(result: ValidationResult, pluginDir: string, pluginName: string): void {
+	const sourceDir = join(pluginDir, "commands-src");
+	if (!existsSync(sourceDir)) {
+		recordFailure(result, `${pluginName}: commands-src/ exists`);
+		return;
+	}
+	for (const commandName of COMMAND_NAMES) {
+		const path = join(sourceDir, `${commandName}.md`);
+		if (!existsSync(path)) {
+			recordFailure(result, `${pluginName}: command source ${commandName} exists`);
+			continue;
+		}
+		const content = readText(path);
+		check(
+			result,
+			content.includes("{{invocation}}"),
+			`${pluginName}: source ${commandName} has an invocation placeholder`,
+		);
+		check(result, !content.includes("${user_config"), `${pluginName}: source ${commandName} is client-neutral`);
+		for (const pattern of POSIX_SHELL_PATTERNS) {
+			check(
+				result,
+				!pattern.test(content),
+				`${pluginName}: source ${commandName} has no POSIX-only shell (${pattern.source})`,
+			);
+		}
+	}
+}
+
+export function validateRepository(root: string): ValidationResult {
+	const result: ValidationResult = { passes: 0, failures: 0, lines: [] };
+	const pluginsRoot = join(root, "plugins");
+	const packageJsonPath = join(root, "package.json");
+
+	if (!existsSync(packageJsonPath)) {
+		recordFailure(result, "package.json exists");
+	} else {
+		const packageJson = asRecord(readJson(packageJsonPath));
+		if (packageJson === null) {
+			recordFailure(result, "package.json is an object");
+		} else {
+			const version = stringValue(packageJson, "version") ?? "0.0.0";
+			check(result, stringValue(packageJson, "name") === "glowing-trefoil", "package name is glowing-trefoil");
+			const bin = asRecord(packageJson.bin);
+			check(
+				result,
+				bin !== null && stringValue(bin, "glowing-trefoil") === "./dist/cli.js",
+				"package bin points at dist/cli.js",
+			);
+			const { files } = packageJson;
+			check(result, Array.isArray(files) && files.includes("plugins/script-forge"), "package files include the plugin");
+			check(result, stringValue(packageJson, "license") === "MIT", "package license is MIT");
+
+			if (existsSync(pluginsRoot)) {
+				for (const entry of readdirSync(pluginsRoot, { withFileTypes: true })) {
+					if (!entry.isDirectory()) {
+						continue;
+					}
+					const pluginDir = join(pluginsRoot, entry.name);
+					checkPlugin(result, pluginDir, entry.name, version);
+					checkSources(result, pluginDir, entry.name);
+				}
+			} else {
+				recordFailure(result, "plugins/ exists");
+			}
+		}
+	}
+
+	checkMarketplace(result, root, join(root, ".claude-plugin", "marketplace.json"), "glowing-trefoil");
+	checkMarketplace(result, root, join(root, ".cursor-plugin", "marketplace.json"), "glowing-trefoil");
+
+	return result;
+}
+
+function main(): void {
+	const root = join(import.meta.dir, "..");
+	const result = validateRepository(root);
+	for (const line of result.lines) {
+		console.log(line);
+	}
+	console.log("---");
+	console.log(`SUMMARY: ${result.passes} pass, ${result.failures} fail`);
+	process.exitCode = result.failures > 0 ? 1 : 0;
+}
+
+if (import.meta.main) {
+	main();
+}

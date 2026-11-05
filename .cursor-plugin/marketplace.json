@@ -1,0 +1,16 @@
+{
+	"name": "glowing-trefoil",
+	"owner": {
+		"name": "NuclearManatee"
+	},
+	"metadata": {
+		"description": "A personal collection of AI-coding plugins. First plugin: Script Forge."
+	},
+	"plugins": [
+		{
+			"name": "script-forge",
+			"source": "./plugins/script-forge",
+			"description": "Script Forge rulebook as a plugin: the anvil skill builds tooling scripts per the rulebook; scaffold, doctor, and lint commands manage every Script Forge workspace."
+		}
+	]
+}

@@ -1,0 +1,53 @@
+---
+title: Scaffold a Script Forge workspace
+description: Create a new Script Forge workspace in the current project — copy templates, wire the project-local ESLint config, install dependencies, git init and first commit.
+argument-hint: "[name] [--force]"
+---
+
+# Scaffold a Script Forge workspace
+
+Creates a new tooling workspace: blank templates, a project-local copy of the
+Script Forge ESLint config, dependencies, and an optional git repository with a
+first commit. Run once per new project; re-running refuses unless `--force`.
+
+## 0. Consent — mandatory
+
+Before any file is written, tell the user exactly what will happen and get
+explicit confirmation:
+
+1. template files copied into the target directory (`package.json`,
+   `tsconfig.json`, `.gitignore`, `<scriptsDir>/`, `<localDir>/`);
+2. `eslint.tooling.js` copied into the project (unless a custom
+   `esLintConfigLocation` is configured);
+3. `bun install` (network; skipped when Bun is absent);
+4. `git init -b main` and, when a git identity is configured, a first commit.
+
+If the user declines, stop without writing anything.
+
+## 1. Run the CLI
+
+{{invocation}}
+
+The invocation includes `--yes`, the consent gate. Run it only after the user
+confirms this invocation.
+
+Useful flags:
+
+- `--target <dir>` — override the configured scaffold directory.
+- `--force` — overwrite template files in an existing workspace.
+- `--no-install` / `--no-git` — skip those steps.
+
+## 2. Report
+
+- Exit 0: summarize the target, files created, ESLint config path, dependency
+  install status, git status, warnings, and the doctor SUMMARY line.
+- Exit 1: user/input problem (for example the target is already scaffolded);
+  report the message and ask before using `--force`.
+- Exit 2: environment problem (for example `bun install` failed); report the
+  failing step and the exact command to retry.
+- Exit 3: an external command failed; report its output.
+- Exit 4: unexpected internal error; report it verbatim.
+- Exit 130: interrupted; report that no further files were written after the
+  interruption.
+
+Never invent a success summary; use the CLI output.

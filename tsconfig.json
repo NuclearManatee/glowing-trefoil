@@ -4,7 +4,7 @@
 		"module": "esnext",
 		"moduleResolution": "bundler",
 		"lib": ["esnext"],
-		"types": ["@types/bun"],
+		"types": ["bun", "node"],
 		"strict": true,
 		"noUncheckedIndexedAccess": true,
 		"noEmit": true,
@@ -12,5 +12,5 @@
 		"erasableSyntaxOnly": true,
 		"skipLibCheck": true
 	},
-	"include": ["commands/scripts/**/*.ts"]
+	"include": ["plugins/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts"]
 }

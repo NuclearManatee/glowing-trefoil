@@ -1,0 +1,20 @@
+{
+	"name": "script-forge",
+	"displayName": "Script Forge",
+	"version": "1.0.0",
+	"description": "Script Forge rulebook as a plugin: the anvil skill builds tooling scripts per the rulebook; scaffold, doctor, and lint commands manage every Script Forge workspace.",
+	"author": {
+		"name": "NuclearManatee"
+	},
+	"repository": "https://github.com/NuclearManatee/glowing-trefoil",
+	"license": "MIT",
+	"keywords": [
+		"script-forge",
+		"anvil",
+		"tooling",
+		"bun",
+		"typescript"
+	],
+	"commands": "./commands-cursor/",
+	"skills": "./skills/"
+}

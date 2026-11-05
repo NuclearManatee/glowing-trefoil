@@ -1,0 +1,41 @@
+---
+title: Lint a Script Forge workspace
+description: Lint the project's TypeScript against its project-local Script Forge ESLint config.
+argument-hint: "[directory] [--fix] [-- <eslint args>]"
+---
+
+# Script Forge lint
+
+Lints the project's scripts and temp-tools against `<project>/eslint.tooling.js`
+or the configured `esLintConfigLocation`. The config's imports resolve from the
+project's own `node_modules`, so the project must have the ESLint toolchain
+installed.
+
+## 0. Consent for --fix
+
+`--fix` rewrites source files. If the user asks for it, tell them which project
+will be modified and get explicit confirmation before adding `--yes`.
+
+## 1. Run the CLI
+
+{{invocation}}
+
+The invocation includes `--yes`. Run it only after the user confirms the
+project that will be modified when `--fix` is used.
+
+The CLI checks the project `package.json`, the ESLint config, and the installed
+ESLint toolchain. It never installs packages on its own.
+
+## 2. Report
+
+- Exit 0: clean, or no matching TypeScript files.
+- Exit 1: lint errors found — summarize the violations and offer `--fix` only
+  with consent.
+- Exit 2: config or dependency problem — report the exact missing piece and the
+  suggested command (for example `bun add -d ...`).
+- Exit 3: an external command failed; report its output.
+- Exit 4: unexpected internal error; report it verbatim.
+- Exit 130: interrupted.
+
+Never dump the ESLint config internals or `node_modules` paths beyond what the
+CLI and ESLint print.

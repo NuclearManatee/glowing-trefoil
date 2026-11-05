@@ -1,115 +1,103 @@
-# Script Forge
+# Glowing Trefoil
 
-A Claude Code plugin for building **local tooling scripts** — data processing,
-file conversion, LLM-powered batch jobs, webhooks, and CLI tools — under the
-Script Forge rulebook (`assets/script-forge.md`).
+A personal collection of AI-coding plugins. The first plugin is **Script Forge**:
+a rulebook plus workflow commands for building local tooling scripts — data
+processing, file conversion, LLM-powered batch jobs, webhooks, and CLI tools.
+
+Works in **Claude Code**, **Claude Cowork**, **Cursor**, and **OpenCode** from
+one shared codebase.
+
+## Plugins
+
+| Plugin | What it does |
+| --- | --- |
+| `script-forge` | The `anvil` skill (the rulebook) and the `scaffold`, `doctor`, `lint` commands. |
+
+## Install
+
+Each harness has one install path that uses its native surface. Full steps,
+updates, uninstalls, and verification: [`docs/install.md`](docs/install.md).
+
+| Harness | Install |
+| --- | --- |
+| Claude Code | `claude plugin install script-forge --marketplace NuclearManatee/glowing-trefoil` |
+| Cowork | Customize → Plugins → Add marketplace → `NuclearManatee/glowing-trefoil` → Install `script-forge` |
+| Cursor | `npx -y glowing-trefoil install cursor`, then reload the window |
+| OpenCode | `npx -y glowing-trefoil install opencode`, then restart |
+
+There is no `install --all`: Cowork and Cursor cannot be installed
+non-interactively, and each harness expects software to arrive its own way.
 
 ## What you get
 
-**One auto-trigger skill: `anvil`** — the rulebook, split into a map
-(`skills/anvil/SKILL.md`) with seven topic references and five real asset files.
-When you ask to build or fix a script, anvil loads only the rules it needs and
-uses the real files directly:
+**One auto-trigger skill, `anvil`** — the rulebook as a map with seven topic
+references and five real assets. When you ask to build or fix a script, anvil
+loads only the rules it needs.
 
-| Asset | Use |
-| --- | --- |
-| `eslint.tooling.js` | the one true ESLint config — projects **point** at it, never copy it |
-| `stepSchema.ts` + `runner.ts` | step zod schemas + the checkpoint & resume engine (bun:sqlite state, resume, rollback) — scripts copy these into `commons/` |
-| `readme.template.md` / `prompt.template.md` | slot shapes for script READMEs and LLM prompt files |
+**Three user-invoked commands**, available as `/script-forge:<name>` in
+Claude Code and Cowork, `/script-forge-<name>` in Cursor and OpenCode:
 
-**Three user-invoked commands:**
+- `scaffold` — create a workspace once: templates, a project-local ESLint
+  config, dependencies, optional `git init` and first commit.
+- `doctor` — Node/Bun runtime, `engines.bun` pin, dependencies, `.env`
+  presence (never contents), folder layout, ESLint config, git state.
+- `lint` — run ESLint against the project-local config; `--fix` with consent.
 
-- `/script-forge:scaffold` — set up a new workspace once: copy templates, wire lint to the shared config, install dependencies, `git init` + first commit.
-- `/script-forge:doctor` — environment + project health check (Bun version, installed deps, `.env` presence — never its content).
-- `/script-forge:lint` — lint the configured script and temp-tool dirs (defaults `scripts/`, `local/tmp/`) against the configured config (default: the plugin's `eslint.tooling.js`) — with `--fix`.
-
-**Blank templates** — `templates/` ships a skeleton (no example code): `package.json`
-(zod + the ESLint toolchain, `engines.bun` pin; tests via built-in `bun test`), `tsconfig.json`,
-`.gitignore`, and `scripts/`, `local/tmp/`, `local/raw_data/` folders kept alive
-by `.gitkeep` files — renamed and rewired at scaffold time to the configured
-`scriptsDirectory` / `localDirectory` (defaults shown).
-
-## Install once, use in every project
-
-The plugin is installed once per machine (user scope — available in every
-project); every project it scaffolds **points** at the plugin's eslint config
-by absolute path. The config's imports resolve from the plugin install's own
-`node_modules` — that is why lint works in any scaffolded project without
-copying anything.
-
-```sh
-# two steps: register the marketplace, then install the plugin (user scope by default)
-/plugin marketplace add https://github.com/NuclearManatee/script-forge.git
-/plugin install script-forge@script-forge
-
-# or manual: point Claude Code at the plugin directory
-claude --plugin-dir /path/to/script-forge
-```
-
-`/plugin install` defaults to user scope — once per machine, enabled in all
-projects. If the install summary says so, run `/reload-plugins` (or restart)
-to activate. Then, once per new project: `/script-forge:scaffold`.
+**Blank templates** — `package.json` (zod + the ESLint toolchain, `engines.bun`
+pin), `tsconfig.json`, `.gitignore`, and the `scripts/`, `local/tmp/`,
+`local/raw_data/` folders.
 
 ## Configuration
 
-Plugin-level `userConfig` (set in Claude Code settings; the plugin is fully
-functional with defaults — you're never forced through the config dialog):
+The plugin works with defaults. Resolution order, highest first:
 
-- `defaultNamespace` (default `tools`) — the `<namespace>:<scriptname>` alias namespace anvil uses.
-- `scaffoldDirectory` (default: the current working directory) — absolute path where `/script-forge:scaffold` creates new workspaces.
-- `scriptsDirectory` (default `scripts`) — where proper scripts live in a workspace.
-- `localDirectory` (default `local`) — the workspace scratch root (`tmp/` and `raw_data/` hang off it).
-- `esLintConfigLocation` (default: the plugin's `eslint.tooling.js`, absolute path, forward slashes) — the ESLint config scaffold and lint point at via `--config`. A custom config resolves its imports relative to its own location.
-- LLM provider & model for prompt files: **asked at runtime** — when anvil creates a prompt file it asks the user, presenting the current default model per provider (looked up at ask time); there is no config default.
+1. CLI flags.
+2. Project `.script-forge.json`.
+3. Claude Code `userConfig` (passed by the generated Claude command).
+4. Global `~/.config/script-forge/config.json`.
+5. Defaults.
 
-Claude Code prompts for `userConfig` when the plugin is enabled; with defaults
-everywhere the dialog is skippable, and the CLI install form never asks. To set
-values after install, add a `pluginConfigs` entry to your **user** settings
-(`~/.claude/settings.json` — project and local settings are ignored), then run
-`/reload-plugins` (or restart):
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `defaultNamespace` | `tools` | `tools:<scriptname>` alias namespace |
+| `scaffoldDirectory` | cwd | where `scaffold` creates workspaces |
+| `scriptsDirectory` | `scripts` | workspace-relative proper-scripts directory |
+| `localDirectory` | `local` | workspace-relative scratch root |
+| `esLintConfigLocation` | `<project>/eslint.tooling.js` | custom ESLint flat config |
 
-```json
-{
-  "pluginConfigs": {
-    "script-forge@script-forge": {
-      "options": {
-        "defaultNamespace": "tools",
-        "esLintConfigLocation": ""
-      }
-    }
-  }
-}
-```
-
-The plugin id is `script-forge@script-forge` (plugin name + marketplace name);
-`options` keys are the `userConfig` names above.
-
-## Workspace shape
-
-A scaffolded project is a plain Bun workspace:
-
-```
-<project>/
-├── scripts/        # proper scripts, built by anvil
-├── local/
-│   ├── tmp/        # throwaway tools (Temp-tools rule)
-│   └── raw_data/   # raw input dumps (No Naked Data rule)
-└── package.json    # zod + ESLint toolchain, lint wired to the plugin's config
-```
-
-`scripts/` and `local/` are renamed at scaffold time if you configure different
-names; the `local/` tree is gitignored.
-
-## A typical session
-
-1. Ask for a script — `anvil` plans, builds, and documents it per the rulebook (frontmatter, diagram, per-step sections).
-2. `/script-forge:lint` keeps it clean; `/script-forge:doctor` checks the environment.
-3. Multi-step jobs checkpoint into bun:sqlite — an interrupted run resumes where it stopped.
+Empty values fall through. Slash-separated directories must stay inside the
+workspace. See [`plugins/script-forge/skills/anvil/references/config.md`](plugins/script-forge/skills/anvil/references/config.md).
 
 ## Requirements
 
-- Bun `1.3.14` (pinned) — the runtime for scripts and the plugin's own tooling.
+- **Runtime:** Node 22+ (the CLI and every generated command).
+- **Workspaces:** Bun `1.3.14` (pinned by the generated `package.json`).
+- **Development:** Bun `1.3.14` for building, testing, and bundling.
+
+Cowork has Node and npm but not guaranteed Bun. `scaffold` still creates the
+workspace and skips `bun install`, printing the exact command to run later;
+`doctor` reports the missing Bun as a failure because the generated workspace
+is Bun-based.
 
 ## Development
 
-Plugin internals, repo layout, and maintenance obligations: `CLAUDE.md`.
+```sh
+bun install
+bun run lint
+bun run typecheck
+bun test
+bun run validate
+bun run build:commands
+bun run build
+```
+
+- `bun run build:commands` regenerates the three command adapters from
+  `plugins/script-forge/commands-src/`. Generated files are committed; CI fails
+  on drift.
+- `bun run build` bundles `dist/cli.js` for Node; it is gitignored and built by
+  `prepack`.
+- Layout rules and maintenance obligations: [`AGENTS.md`](AGENTS.md).
+
+## License
+
+MIT — see [`LICENSE`](LICENSE).
