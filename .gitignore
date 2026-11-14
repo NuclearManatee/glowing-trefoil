@@ -2,5 +2,12 @@ node_modules/
 dist/
 *.tgz
 /local/
+.env
+.env.*
+!.env.example
+.eslintcache
+coverage/
+.DS_Store
+Thumbs.db
 settings.local.json
 CLAUDE.local.md

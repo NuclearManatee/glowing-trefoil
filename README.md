@@ -98,6 +98,10 @@ bun run build
   `prepack`.
 - Layout rules and maintenance obligations: [`AGENTS.md`](AGENTS.md).
 
+## Release history
+
+See [`CHANGELOG.md`](CHANGELOG.md).
+
 ## License
 
 MIT — see [`LICENSE`](LICENSE).

@@ -39,8 +39,15 @@ dependencies.
 ## Configuration
 
 Resolution order: CLI flags, project `.script-forge.json`, Claude `userConfig`,
-global `~/.config/script-forge/config.json`, defaults. Full contract:
-`skills/anvil/references/config.md`.
+global `~/.config/script-forge/config.json`, defaults. Inspect the resolved
+values and their sources with:
+
+```sh
+npx -y glowing-trefoil config
+npx -y glowing-trefoil config --json
+```
+
+Full contract: `skills/anvil/references/config.md`.
 
 ## Troubleshooting
 

@@ -19,6 +19,7 @@ Do not deviate from it when changing the skill, commands, or templates.
 .
 ├── .claude-plugin/marketplace.json      # Claude Code + Cowork marketplace
 ├── .cursor-plugin/marketplace.json      # Cursor marketplace
+├── .gitattributes                       # LF line endings everywhere
 ├── .github/workflows/ci.yml
 ├── docs/
 │   ├── adr/                             # decisions
@@ -38,6 +39,7 @@ Do not deviate from it when changing the skill, commands, or templates.
 │   └── lib/                             # config, paths, scaffold, doctor, lint, install
 ├── scripts/                             # buildCommands, buildCli, validate
 ├── tests/
+├── CHANGELOG.md
 ├── package.json                         # npm package (glowing-trefoil)
 └── eslint.tooling.js                    # repo-only wrapper over the plugin asset
 ```
@@ -129,15 +131,20 @@ CI runs the same on `ubuntu-latest` and `windows-latest`.
 1. Create `plugins/<id>/` with `.claude-plugin/plugin.json` and
    `.cursor-plugin/plugin.json`; keep versions equal to the root package.
 2. Add `commands-src/` and generate the three adapters with
-   `bun run build:commands` (extend `COMMAND_NAMES` in
-   `plugins/script-forge/lib/commands.ts` if the new plugin reuses the same
-   command generator).
+   `bun run build:commands`. The generator in
+   `plugins/script-forge/lib/commands.ts` is currently Script Forge-specific;
+   either extend `COMMAND_NAMES` for a plugin with the same three commands or
+   give the new plugin its own generator.
 3. Add `skills/<name>/SKILL.md` with `name` equal to the folder and a
    non-empty `description` of at most 1024 characters.
-4. Keep client-specific strings out of the plugin. `bun run validate` checks
+4. Add `templates/package.json`, `templates/tsconfig.json`,
+   `templates/gitignore`, and the `.gitkeep` files for `scripts/`, `local/tmp/`,
+   and `local/raw_data/`. `bun run validate` checks this list; keep it in sync.
+5. Keep client-specific strings out of the plugin. `bun run validate` checks
    for `${user_config`, `${CLAUDE_PLUGIN_ROOT}`, `AskUserQuestion`, and
    `Claude Code tools` outside generated Claude commands.
-5. Do not add `bin/`, `package.json`, or `node_modules/` to the plugin.
-6. Add the plugin to both marketplace manifests and to the README catalog.
-7. Document its install path in `docs/install.md`.
-8. Run the full verification list.
+6. Do not add `bin/`, `package.json`, or `node_modules/` to the plugin.
+7. Add the plugin to both marketplace manifests, the README catalog, and
+   `CHANGELOG.md`.
+8. Document its install path in `docs/install.md`.
+9. Run the full verification list.

@@ -51,6 +51,9 @@ no top-level `bin/`, no `package.json`, and no `node_modules`.
 
 Verify: `/script-forge:scaffold` appears and a scaffold task runs.
 
+Update: **Customize → Plugins**, find `script-forge`, and update it from the
+marketplace. Uninstall: **Customize → Plugins**, remove `script-forge`.
+
 ## Cursor
 
 ```sh
