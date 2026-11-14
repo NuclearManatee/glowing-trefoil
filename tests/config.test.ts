@@ -1,7 +1,8 @@
-import { afterAll, describe, expect, test } from "bun:test";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { after, describe, test } from "node:test";
 import {
 	assertWorkspaceRelative,
 	loadConfig,
@@ -18,7 +19,7 @@ function temporaryRoot(): string {
 	return root;
 }
 
-afterAll(() => {
+after(() => {
 	for (const root of roots) {
 		rmSync(root, { recursive: true, force: true });
 	}
@@ -47,10 +48,10 @@ describe("config resolution", () => {
 			cli: { defaultNamespace: "cli" },
 		});
 
-		expect(resolved.values.defaultNamespace).toBe("cli");
-		expect(resolved.values.scriptsDirectory).toBe("projectScripts");
-		expect(resolved.sources.defaultNamespace).toBe("cli");
-		expect(resolved.sources.scriptsDirectory).toBe("project");
+		assert.equal(resolved.values.defaultNamespace, "cli");
+		assert.equal(resolved.values.scriptsDirectory, "projectScripts");
+		assert.equal(resolved.sources.defaultNamespace, "cli");
+		assert.equal(resolved.sources.scriptsDirectory, "project");
 	});
 
 	test("empty strings fall through to the next layer", () => {
@@ -65,13 +66,13 @@ describe("config resolution", () => {
 			cli: { scriptsDirectory: "" },
 		});
 
-		expect(resolved.values.scriptsDirectory).toBe("claudeScripts");
+		assert.equal(resolved.values.scriptsDirectory, "claudeScripts");
 	});
 
 	test("defaults are complete", () => {
 		const root = temporaryRoot();
 		const resolved = loadConfig({ projectDir: root, homeDir: join(root, "home") });
-		expect(resolved.values).toEqual({
+		assert.deepEqual(resolved.values, {
 			defaultNamespace: "tools",
 			scaffoldDirectory: "",
 			scriptsDirectory: "scripts",
@@ -81,32 +82,32 @@ describe("config resolution", () => {
 	});
 
 	test("invalid Claude config JSON is a user error", () => {
-		expect(() => parseClaudeConfig("{")).toThrow();
+		assert.throws(() => parseClaudeConfig("{"));
 	});
 });
 
 describe("path safety", () => {
 	test("rejects parent escapes and absolute paths", () => {
-		expect(() => assertWorkspaceRelative("../outside", "scriptsDirectory")).toThrow();
-		expect(() => assertWorkspaceRelative("C:/absolute", "scriptsDirectory")).toThrow();
-		expect(() => assertWorkspaceRelative("/absolute", "scriptsDirectory")).toThrow();
+		assert.throws(() => assertWorkspaceRelative("../outside", "scriptsDirectory"));
+		assert.throws(() => assertWorkspaceRelative("C:/absolute", "scriptsDirectory"));
+		assert.throws(() => assertWorkspaceRelative("/absolute", "scriptsDirectory"));
 	});
 
 	test("accepts nested workspace paths", () => {
-		expect(assertWorkspaceRelative("tools/scripts", "scriptsDirectory")).toBe("tools/scripts");
+		assert.equal(assertWorkspaceRelative("tools/scripts", "scriptsDirectory"), "tools/scripts");
 	});
 
 	test("scaffold target falls back to the project directory", () => {
 		const root = temporaryRoot();
-		expect(resolveScaffoldTarget({ ...defaultConfig(), scaffoldDirectory: "" }, root, root)).toBe(root);
+		assert.equal(resolveScaffoldTarget({ ...defaultConfig(), scaffoldDirectory: "" }, root, root), root);
 	});
 
 	test("project-local ESLint config is discovered", () => {
 		const root = temporaryRoot();
 		writeFileSync(join(root, "eslint.tooling.js"), "export default [];\n");
 		const resolved = resolveEslintConfig(defaultConfig(), root, root);
-		expect(resolved?.source).toBe("project");
-		expect(resolved?.path).toBe(join(root, "eslint.tooling.js"));
+		assert.equal(resolved?.source, "project");
+		assert.equal(resolved?.path, join(root, "eslint.tooling.js"));
 	});
 });
 

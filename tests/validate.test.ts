@@ -1,7 +1,8 @@
-import { afterAll, describe, expect, test } from "bun:test";
+import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { after, describe, test } from "node:test";
 import { validateRepository } from "../scripts/validate.ts";
 
 const roots: string[] = [];
@@ -25,9 +26,9 @@ function buildFixture(): string {
 			name: "glowing-trefoil",
 			version: "1.0.0",
 			license: "MIT",
-			bin: { "glowing-trefoil": "./dist/cli.js" },
+			bin: { "glowing-trefoil": "./dist/cli/index.js" },
 			files: ["dist", "plugins/script-forge", "README.md", "CHANGELOG.md", "LICENSE"],
-			engines: { node: ">=22", bun: "1.3.14" },
+			engines: { node: ">=22.18.0" },
 		}),
 	);
 	write(
@@ -73,13 +74,14 @@ function buildFixture(): string {
 		"scripts/.gitkeep",
 		"local/tmp/.gitkeep",
 		"local/raw_data/.gitkeep",
+		"tests/smoke.test.ts",
 	]) {
 		write(join(plugin, "templates", relative), "");
 	}
 	return root;
 }
 
-afterAll(() => {
+after(() => {
 	for (const root of roots) {
 		rmSync(root, { recursive: true, force: true });
 	}
@@ -88,37 +90,37 @@ afterAll(() => {
 describe("repository validator", () => {
 	test("a well-formed fixture passes", () => {
 		const result = validateRepository(buildFixture());
-		expect(result.failures).toBe(0);
-		expect(result.passes).toBeGreaterThan(0);
+		assert.equal(result.failures, 0);
+		assert.ok(result.passes > 0);
 	});
 
 	test("a skill whose frontmatter name does not match its folder fails", () => {
 		const root = buildFixture();
 		write(join(root, "plugins", "sample", "skills", "anvil", "SKILL.md"), "---\nname: other\n---\n");
 		const result = validateRepository(root);
-		expect(result.lines.some((line) => line.includes("frontmatter name matches") && line.startsWith("[FAIL]"))).toBe(true);
+		assert.ok(result.lines.some((line) => line.includes("frontmatter name matches") && line.startsWith("[FAIL]")));
 	});
 
 	test("a forbidden portable string in the rulebook fails", () => {
 		const root = buildFixture();
 		write(join(root, "plugins", "sample", "assets", "script-forge.md"), "Use AskUserQuestion.\n");
 		const result = validateRepository(root);
-		expect(result.lines.some((line) => line.includes("AskUserQuestion") && line.startsWith("[FAIL]"))).toBe(true);
+		assert.ok(result.lines.some((line) => line.includes("AskUserQuestion") && line.startsWith("[FAIL]")));
 	});
 
 	test("a top-level bin/ directory fails", () => {
 		const root = buildFixture();
 		mkdirSync(join(root, "plugins", "sample", "bin"), { recursive: true });
 		const result = validateRepository(root);
-		expect(result.lines.some((line) => line.includes("no top-level bin/") && line.startsWith("[FAIL]"))).toBe(true);
+		assert.ok(result.lines.some((line) => line.includes("no top-level bin/") && line.startsWith("[FAIL]")));
 	});
 
 	test("a missing template .gitkeep fails", () => {
 		const root = buildFixture();
 		rmSync(join(root, "plugins", "sample", "templates", "local", "tmp", ".gitkeep"));
 		const result = validateRepository(root);
-		expect(result.lines.some((line) => line.includes("template local/tmp/.gitkeep") && line.startsWith("[FAIL]"))).toBe(
-			true,
+		assert.ok(
+			result.lines.some((line) => line.includes("template local/tmp/.gitkeep") && line.startsWith("[FAIL]")),
 		);
 	});
 
@@ -129,6 +131,23 @@ describe("repository validator", () => {
 			JSON.stringify({ name: "glowing-trefoil", plugins: [{ name: "ghost", source: "./plugins/ghost" }] }),
 		);
 		const result = validateRepository(root);
-		expect(result.failures).toBeGreaterThan(0);
+		assert.ok(result.failures > 0);
+	});
+
+	test("a bun engine pin is rejected", () => {
+		const root = buildFixture();
+		write(
+			join(root, "package.json"),
+			JSON.stringify({
+				name: "glowing-trefoil",
+				version: "1.0.0",
+				license: "MIT",
+				bin: { "glowing-trefoil": "./dist/cli/index.js" },
+				files: ["dist", "plugins/script-forge", "README.md", "CHANGELOG.md", "LICENSE"],
+				engines: { node: ">=22.18.0", bun: "1.3.14" },
+			}),
+		);
+		const result = validateRepository(root);
+		assert.ok(result.lines.some((line) => line.includes("no bun pin") && line.startsWith("[FAIL]")));
 	});
 });

@@ -1,6 +1,8 @@
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
 
-export const BUN_PIN = "1.3.14";
+export const NODE_MIN = "22.18.0";
 
 export type CommandResult = {
 	status: number | null;
@@ -37,13 +39,71 @@ export function runInherit(command: string, args: string[], cwd?: string): numbe
 	return result.status ?? -1;
 }
 
-export function bunVersion(): string | null {
-	const result = runCapture("bun", ["--version"]);
-	if (result.error !== null || result.status !== 0) {
+type ParsedVersion = {
+	major: number;
+	minor: number;
+	patch: number;
+};
+
+function parseVersion(value: string): ParsedVersion | null {
+	const match = /(\d+)\.(\d+)(?:\.(\d+))?/.exec(value);
+	if (match === null) {
 		return null;
 	}
-	const version = result.stdout.trim();
-	return version === "" ? null : version;
+	const [, major = "0", minor = "0", patch = "0"] = match;
+	return {
+		major: Number(major),
+		minor: Number(minor),
+		patch: Number(patch),
+	};
+}
+
+export function nodeVersion(): string {
+	return process.versions.node;
+}
+
+export function meetsMinimum(actual: string, minimum: string): boolean {
+	const found = parseVersion(actual);
+	const wanted = parseVersion(minimum);
+	if (found === null || wanted === null) {
+		return false;
+	}
+	if (found.major !== wanted.major) {
+		return found.major > wanted.major;
+	}
+	if (found.minor !== wanted.minor) {
+		return found.minor > wanted.minor;
+	}
+	return found.patch >= wanted.patch;
+}
+
+// npm is a .cmd shim on Windows, which child_process cannot spawn with
+// shell: false. Resolve its JavaScript entry point and run it with Node instead;
+// this keeps the shell-free subprocess rule intact on every platform.
+export function npmCliPath(): string | null {
+	const fromEnv = process.env.npm_execpath;
+	if (fromEnv !== undefined && fromEnv.endsWith("npm-cli.js") && existsSync(fromEnv)) {
+		return fromEnv;
+	}
+	const nodeDir = dirname(process.execPath);
+	const candidates = [
+		join(nodeDir, "node_modules", "npm", "bin", "npm-cli.js"),
+		join(nodeDir, "..", "lib", "node_modules", "npm", "bin", "npm-cli.js"),
+	];
+	for (const candidate of candidates) {
+		if (existsSync(candidate)) {
+			return candidate;
+		}
+	}
+	return null;
+}
+
+export function runNpm(args: string[], cwd: string): number {
+	const cli = npmCliPath();
+	if (cli === null) {
+		return -1;
+	}
+	return runInherit(process.execPath, [cli, ...args], cwd);
 }
 
 export function gitVersion(): string | null {
@@ -53,13 +113,4 @@ export function gitVersion(): string | null {
 	}
 	const version = result.stdout.trim();
 	return version === "" ? null : version;
-}
-
-export function versionMismatch(pinned: string, actual: string): boolean {
-	const wanted = pinned.match(/(\d+)\.(\d+)\.(\d+)/);
-	const found = actual.match(/(\d+)\.(\d+)\.(\d+)/);
-	if (wanted === null || found === null) {
-		return false;
-	}
-	return wanted.slice(1, 4).join(".") !== found.slice(1, 4).join(".");
 }

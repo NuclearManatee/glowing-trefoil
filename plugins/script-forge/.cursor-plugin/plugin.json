@@ -12,7 +12,7 @@
 		"script-forge",
 		"anvil",
 		"tooling",
-		"bun",
+		"node",
 		"typescript"
 	],
 	"commands": "./commands-cursor/",

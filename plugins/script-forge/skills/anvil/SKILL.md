@@ -10,7 +10,7 @@ This skill is the **map**, not the book. The rulebook lives in the files below; 
 ## The layout
 
 - `references/` — the rulebook, split by topic. Read what you need:
-  - `techStack.md` — Bun+TS, the must-have/pre-authorized dependency lists, the eslint dev-deps group.
+  - `techStack.md` — Node+TS, the must-have/pre-authorized dependency lists, the eslint dev-deps group.
   - `config.md` — how configuration is resolved: the configurable directories and defaults every other reference's paths refer to (scripts, local/tmp, local/raw_data, scaffold target, eslint config, LLM model).
   - `codeStandards.md` — runtime & architecture (zod at ingress, fail fast, exit-code taxonomy 0/1/2/3/4 + 130, why-comments), logging rules, and where the ESLint rules live.
   - `domainPatterns.md` — Data I/O (raw_data layout, Temporal, memory-conscious ingress), file formats, LLM patterns (surface area, generateObject, rate control, prompt files), networking (hono, ngrok, signatures).
@@ -21,11 +21,31 @@ This skill is the **map**, not the book. The rulebook lives in the files below; 
 - `assets/` — real files. Use them as-is; never rewrite their content:
   - `eslint.tooling.js` — the one true ESLint config (rulebook verbatim). `scaffold` copies it into each project as `<project>/eslint.tooling.js`; the project copy's imports resolve from the project's own `node_modules`. Never hand-edit the project copy; the plugin asset is the source of truth.
   - `stepSchema.ts` — the step zod schemas (`stepContext`, `stepDef`, `stepList`). **Copy** into `<scriptsDir>/<name>/commons/stepSchema.ts`.
-  - `runner.ts` — the checkpoint & resume engine: per-run bun:sqlite state DB (WAL), skip done, restart from first pending/failed, orphaned-row confirmation, mark-done-only-after-write, reverse-replay rollback with rollbackFn. **Copy** into `<scriptsDir>/<name>/commons/runner.ts` together with stepSchema.ts, then compose steps in `index.ts` per lifecycle.md → Step Orchestration.
+  - `runner.ts` — the checkpoint & resume engine: per-run JSON state file with atomic temp-file rename, skip done, restart from first pending/failed, orphaned-row confirmation, mark-done-only-after-write, reverse-replay rollback with rollbackFn. **Copy** into `<scriptsDir>/<name>/commons/runner.ts` together with stepSchema.ts, then compose steps in `index.ts` per lifecycle.md → Step Orchestration.
   - `readme.template.md` — the slot shape for a script's README. Fill it when writing `<scriptsDir>/<name>/README.md` (documentation.md explains the requirements).
   - `prompt.template.md` — the slot shape for LLM prompt files under `<scriptsDir>/<name>/assets/prompts/`.
 
 **Copy vs point:** `eslint.tooling.js` is copied into the project once by `scaffold`; that project copy is the lint target and resolves its imports from the project's `node_modules`. stepSchema/runner are *copied* because scripts run standalone with their own dependencies. Templates are *filled*, never shipped as-is into a script.
+
+## Node + TypeScript non-negotiables
+
+Node runs TypeScript by stripping types, not transforming them. These rules
+prevent startup failures; the references explain each one.
+
+1. Run with Node 22.18+ and npm: `npm run`, `node`, `node --test`. Bun commands
+   are not available.
+2. No `enum`, namespace with runtime code, parameter properties, import
+   aliases, decorators, or `.tsx`.
+3. Relative imports end in `.ts`; type-only imports and re-exports use
+   `import type` / `export type`; no `tsconfig` `paths` (use relative or `#`
+   subpaths).
+4. `tsc --noEmit` type-checks; Node does not. The template enables
+   `erasableSyntaxOnly` and `verbatimModuleSyntax`, and `npm run typecheck`
+   catches violations before runtime.
+5. `.env` is loaded by `node --env-file-if-exists=.env`; prefix script aliases
+   with it; never read `.env` as a file.
+6. No `Bun.*`, `bun:*`, `HTMLRewriter`, `import.meta.dir`, or `node:sqlite` on
+   Node 22.
 
 ## Your config
 
@@ -37,7 +57,7 @@ Throughout this skill:
 
 - `<namespace>` — default `tools`; used for `<namespace>:<scriptname>` aliases.
 - `<scriptsDir>` — default `scripts`.
-- `<localDir>` — default `local` (with `tmp/` and `raw_data/` children).
+- `<localDir>` — default `local` (with `tmp/`, `raw_data/`, and `state/` children).
 - `<eslintConfig>` — default `<project>/eslint.tooling.js`.
 - Scaffold target — default the current working directory.
 
@@ -51,8 +71,8 @@ or memory).
 1. **Plan first** when the approach is uncertain or the change spans files — follow lifecycle.md → Planning (research with subagents, ask the user in ≤2 batches, end with a validation step).
 2. **Investigate with scripts, not inline code** — temp-tools in `<localDir>/tmp/`, raw data in `<localDir>/raw_data/` (defaults `local/tmp/`, `local/raw_data/`), stats-only output (No Naked Data).
 3. **Scaffold new proper scripts** with the scaffold command once per project; new scripts inside an existing project follow lifecycle.md → Scaffolding.
-4. **Never read `.env` as a file**; `process.env` only. **Never eval / `bun -e` / Python.**
-5. **Validate before done** — lifecycle.md → Validating (tsc, eslint via lint, TDD bun test, fixtures follow No Naked Data).
+4. **Never read `.env` as a file**; `process.env` only. **Never eval / `node -e` / Python.**
+5. **Validate before done** — lifecycle.md → Validating (tsc, eslint via lint, TDD `node --test`, fixtures follow No Naked Data).
 6. **Update the script's README in the same commit** as step/index changes.
 
 ## Helper commands

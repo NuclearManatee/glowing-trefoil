@@ -7,7 +7,8 @@ the plugin collection itself, not a scaffolded Script Forge workspace.
 
 - Marketplace / collection: `glowing-trefoil`.
 - First plugin: `script-forge` under `plugins/script-forge/`.
-- One npm package, `glowing-trefoil`, ships the plugin folder and `dist/cli.js`.
+- One npm package, `glowing-trefoil`, ships the plugin folder and
+  `dist/cli/index.js`.
 - Commands run the CLI through `npx -y glowing-trefoil <command>`.
 
 Binding document for script behavior: `plugins/script-forge/assets/script-forge.md`.
@@ -58,12 +59,12 @@ No plugin may contain a top-level `bin/`, a `package.json`, or
   — `name: glowing-trefoil`; every `source` must resolve to an existing plugin
   folder.
 
-`bun run validate` enforces all of the above.
+`npm run validate` enforces all of the above.
 
 ## Commands are generated
 
 `plugins/script-forge/commands-src/*.md` is the only place command prose lives.
-`bun run build:commands` emits:
+`npm run build:commands` emits:
 
 - `commands/<name>.md` — Claude Code + Cowork; passes
   `--claude-config-json` and uses `$ARGUMENTS`.
@@ -82,10 +83,12 @@ Rules:
 
 ## CLI rules
 
-- Build with Bun; run on Node 22+.
+- Build and run on Node 22.18+. The CLI is compiled to JavaScript with `tsc`;
+  source files use erasable TypeScript only.
 - No Bun APIs in `plugins/script-forge/cli/` or `lib/`; use `node:` builtins.
 - Subprocesses use array arguments and `shell: false`. Never `cp`, `mv`,
-  `mkdir -p`, or `cd &&`.
+  `mkdir -p`, or `cd &&`. npm is invoked through its `npm-cli.js` entry point
+  because the Windows `.cmd` shim cannot be spawned without a shell.
 - Exit taxonomy: `0` success, `1` user/input, `2` environment, `3` external
   command failure, `4` internal, `130` SIGINT.
 - Write commands (`scaffold`, `lint --fix`) require `--yes`; command prose
@@ -96,7 +99,7 @@ Rules:
 ## Versions and releases
 
 - Root `package.json`, both plugin manifests, and the npm package share one
-  version. `bun run validate` compares them.
+  version. `npm run validate` compares them.
 - `dist/` is gitignored and rebuilt by `prepack`.
 - Generated command files reference the published package by name, so an npm
   release is required for the short install commands.
@@ -105,42 +108,45 @@ Rules:
 
 ## Runtime pins
 
-- Bun: `1.3.14` (`engines.bun`, CI, and `lib/runtime.ts`).
-- Node: `>=22`.
-- Templates pin Bun and declare the ESLint toolchain, TypeScript, and zod.
+- Node: `22.18.0` (`engines.node`, CI floor, and `lib/runtime.ts`).
+- npm: the version bundled with the Node release; no separate pin.
+- Templates declare `engines.node >=22.18.0` and the ESLint toolchain,
+  TypeScript, `@types/node`, and zod.
 
 ## Verification
 
 Run before handing off:
 
 ```sh
-bun run lint
-bun run typecheck
-bun test
-bun run validate
-bun run build:commands
+npm run lint
+npm run typecheck
+npm test
+npm run validate
+npm run build:commands
 git diff --exit-code
-bun run build
+npm run build
 npm pack --dry-run
 ```
 
-CI runs the same on `ubuntu-latest` and `windows-latest`.
+CI runs the same on `ubuntu-latest` and `windows-latest`, on Node `22.18.x` and
+`26.x`.
 
 ## Adding a plugin
 
 1. Create `plugins/<id>/` with `.claude-plugin/plugin.json` and
    `.cursor-plugin/plugin.json`; keep versions equal to the root package.
 2. Add `commands-src/` and generate the three adapters with
-   `bun run build:commands`. The generator in
+   `npm run build:commands`. The generator in
    `plugins/script-forge/lib/commands.ts` is currently Script Forge-specific;
    either extend `COMMAND_NAMES` for a plugin with the same three commands or
    give the new plugin its own generator.
 3. Add `skills/<name>/SKILL.md` with `name` equal to the folder and a
    non-empty `description` of at most 1024 characters.
 4. Add `templates/package.json`, `templates/tsconfig.json`,
-   `templates/gitignore`, and the `.gitkeep` files for `scripts/`, `local/tmp/`,
-   and `local/raw_data/`. `bun run validate` checks this list; keep it in sync.
-5. Keep client-specific strings out of the plugin. `bun run validate` checks
+   `templates/gitignore`, the `.gitkeep` files for `scripts/`, `local/tmp/`,
+   and `local/raw_data/`, and `tests/smoke.test.ts`. `npm run validate` checks
+   this list; keep it in sync.
+5. Keep client-specific strings out of the plugin. `npm run validate` checks
    for `${user_config`, `${CLAUDE_PLUGIN_ROOT}`, `AskUserQuestion`, and
    `Claude Code tools` outside generated Claude commands.
 6. Do not add `bin/`, `package.json`, or `node_modules/` to the plugin.

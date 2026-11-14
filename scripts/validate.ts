@@ -12,6 +12,7 @@ const REQUIRED_TEMPLATE_FILES = [
 	"scripts/.gitkeep",
 	"local/tmp/.gitkeep",
 	"local/raw_data/.gitkeep",
+	"tests/smoke.test.ts",
 ];
 const REQUIRED_PACKAGE_FILES = ["dist", "plugins/script-forge", "README.md", "CHANGELOG.md", "LICENSE"];
 
@@ -284,8 +285,8 @@ export function validateRepository(root: string): ValidationResult {
 			const bin = asRecord(packageJson.bin);
 			check(
 				result,
-				bin !== null && stringValue(bin, "glowing-trefoil") === "./dist/cli.js",
-				"package bin points at dist/cli.js",
+				bin !== null && stringValue(bin, "glowing-trefoil") === "./dist/cli/index.js",
+				"package bin points at dist/cli/index.js",
 			);
 			const { files } = packageJson;
 			check(
@@ -295,8 +296,16 @@ export function validateRepository(root: string): ValidationResult {
 			);
 			check(result, stringValue(packageJson, "license") === "MIT", "package license is MIT");
 			const engines = asRecord(packageJson.engines);
-			check(result, engines !== null && stringValue(engines, "node") === ">=22", 'package engines.node is ">=22"');
-			check(result, engines !== null && stringValue(engines, "bun") === "1.3.14", 'package engines.bun is "1.3.14"');
+			check(
+				result,
+				engines !== null && stringValue(engines, "node") === ">=22.18.0",
+				'package engines.node is ">=22.18.0"',
+			);
+			check(
+				result,
+				engines !== null && stringValue(engines, "bun") === undefined,
+				"package engines has no bun pin",
+			);
 
 			if (existsSync(pluginsRoot)) {
 				for (const entry of readdirSync(pluginsRoot, { withFileTypes: true })) {
@@ -320,7 +329,7 @@ export function validateRepository(root: string): ValidationResult {
 }
 
 function main(): void {
-	const root = join(import.meta.dir, "..");
+	const root = join(import.meta.dirname, "..");
 	const result = validateRepository(root);
 	for (const line of result.lines) {
 		console.log(line);

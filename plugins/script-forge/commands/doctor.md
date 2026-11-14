@@ -1,5 +1,5 @@
 ---
-description: "Check the Script Forge environment and project health — Node and Bun runtimes, engines.bun, dependencies, .env presence, folder layout, ESLint config, and git state."
+description: "Check the Script Forge environment and project health — Node runtime, engines.node, dependencies, .env presence, folder layout, ESLint config, and git state."
 argument-hint: "[directory]"
 user-invocable: true
 disable-model-invocation: true
@@ -11,7 +11,7 @@ allowed-tools: Bash(npx:*)
 # Script Forge doctor
 
 Health check for the Script Forge environment and the current (or given)
-project. The CLI checks the Node runtime, the pinned Bun runtime, the project
+project. The CLI checks the Node runtime and minimum version, the project
 manifest, declared and installed dependencies, `.env` presence only, the
 workspace layout, the project-local ESLint config, and git state.
 

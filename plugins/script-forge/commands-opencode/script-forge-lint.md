@@ -36,7 +36,7 @@ ESLint toolchain. It never installs packages on its own.
 - Exit 1: lint errors found — summarize the violations and offer `--fix` only
   with consent.
 - Exit 2: config or dependency problem — report the exact missing piece and the
-  suggested command (for example `bun add -d ...`).
+  suggested command (for example `npm install -D ...`).
 - Exit 3: an external command failed; report its output.
 - Exit 4: unexpected internal error; report it verbatim.
 - Exit 130: interrupted.

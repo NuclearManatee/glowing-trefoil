@@ -12,6 +12,7 @@
 * Raw datasets are dropped into `<localDir>/raw_data` (gitignored) — see **No Naked Data**.
 * You may decide to promote a temp-tool into a proper script (see below). If so, propose it to the User first.
 * Treat `<localDir>/tmp` as fully disposable — no persistence guarantee, no mid-session cleanup ceremony.
+* Checkpoint state is not kept in `<localDir>/tmp`: the runner writes it under `<localDir>/state/`, which is gitignored and survives `<localDir>/tmp` sweeps (see **Principles → Checkpoint & Resume**).
 * On promotion to `<scriptsDir>/`, delete the temp-tool version in the same commit — Clean Kitchen applies to the file's own lifecycle too.
 * At the start of a new planning session, sweep `<localDir>/tmp` of anything not referenced by the current task — judgment call, no fixed TTL.
 * If something in `<localDir>/tmp` needs to survive across sessions, that's a signal to either promote it or log the reason to the client's persistent memory when available — not leave it implicit.
@@ -26,30 +27,31 @@
 ├── commons/                # functions shared across steps
 ├── steps/                  # one .ts file per step (or a generic file for dynamically-generated steps)
 ├── tests/
-│   ├── bun/                 # unit + integration tests (*.test.ts)
+│   ├── node/                # unit + integration tests (*.test.ts)
 │   ├── playwright/          # optional, e2e tests
-│   └── fixtures/            # shared by bun test and playwright
+│   └── fixtures/            # shared by node --test and playwright
 ├── assets/
 │   └── prompts/             # optional, LLM prompt files (see LLMs → Prompt Files)
 └── README.md               # required, see Documentation
 ```
 
-* Reference every script in `package.json` as `<namespace>:<scriptname>` and run it from there with **Bun**, e.g. `"tools:ordersSummary": "bun run scripts/ordersSummary/index.ts"` (= `<scriptsDir>`) → `bun run tools:ordersSummary`. `<namespace>` groups scripts by domain (e.g. `tools`, `reports`) — reuse an existing namespace when the script fits one, don't mint a new one per script. Use the default namespace from `<namespace>` unless the script belongs to an existing one.
+* Reference every script in `package.json` as `<namespace>:<scriptname>` and run it from there with **npm**, e.g. `"tools:ordersSummary": "node --env-file-if-exists=.env scripts/ordersSummary/index.ts"` (= `<scriptsDir>`) → `npm run tools:ordersSummary`. `<namespace>` groups scripts by domain (e.g. `tools`, `reports`) — reuse an existing namespace when the script fits one, don't mint a new one per script. Use the default namespace from `<namespace>` unless the script belongs to an existing one.
+* The workspace template ships `tests/smoke.test.ts` so `npm test` is green before the first script exists; script-specific tests live under `<scriptsDir>/<scriptname>/tests/node/`.
 
 ## Step Orchestration
 
 > `index.ts` composes the step list before running it. Step order can be dynamic — built with plain `if`/`else` and `for`-loops — rather than encoded in filenames. This is deliberately handled in-house: LangGraph and similar graph/agent-orchestration libraries are rejected (see **LLMs → Surface Area Constraint**) because they duplicate and compete with **Checkpoint & Resume** rather than complement it.
 
-**Step schema** — the zod schemas (`stepContext`, `stepDef`, `stepList`) live in `assets/stepSchema.ts` (anvil asset); scripts copy it into `commons/stepSchema.ts`. It validates: `name` (matches `stepRow.step` in the state db), `run(ctx)`, `rollback` (compensating-action description or `null`), `rollbackFn(ctx)` (or `null`).
+**Step schema** — the zod schemas (`stepContext`, `stepDef`, `stepList`) live in `assets/stepSchema.ts` (anvil asset); scripts copy it into `commons/stepSchema.ts`. It validates: `name` (matches `stepRow.step` in the state file), `run(ctx)`, `rollback` (compensating-action description or `null`), `rollbackFn(ctx)` (or `null`).
 
-**Checkpoint & Resume engine** — `assets/runner.ts` (anvil asset) implements the full engine: per-run `bun:sqlite` state DB in WAL mode, skip `done` rows on resume, restart from the first `pending`/`failed` row, orphaned-row reconciliation with explicit confirmation, mark-done-only-after-write, and reverse-replay rollback invoking `rollbackFn` or surfacing the `rollback` string as a manual action. Scripts copy it into `commons/runner.ts` together with `stepSchema.ts`.
+**Checkpoint & Resume engine** — `assets/runner.ts` (anvil asset) implements the full engine: per-run JSON state file under `<localDir>/state/` (default `local/state/`) with atomic temp-file rename, skip `done` rows on resume, restart from the first `pending`/`failed` row, orphaned-row reconciliation with explicit confirmation, mark-done-only-after-write, and reverse-replay rollback invoking `rollbackFn` or surfacing the `rollback` string as a manual action. Scripts copy it into `commons/runner.ts` together with `stepSchema.ts`.
 
 **Dynamic composition — conditional step + loop-generated steps** (`index.ts`):
 
 ```ts
-import { stepList } from "./commons/stepSchema";
-import { fetchStep, validateStep, enrichStep, writeStep, perRegionStep } from "./steps";
-import { runStep } from "./commons/runner"; // wraps Checkpoint & Resume sqlite logic
+import { stepList } from "./commons/stepSchema.ts";
+import { StepRunner } from "./commons/runner.ts";
+import { fetchStep, validateStep, enrichStep, writeStep, perRegionStep } from "./steps/index.ts";
 
 const needsEnrichment = process.env.ENRICH === "1";
 const regions = ["eu", "us", "apac"];
@@ -69,12 +71,15 @@ const steps = stepList.parse([
   { name: "write_summary", run: writeStep, rollback: null, rollbackFn: null },
 ]);
 
-for (const step of steps) {
-  await runStep(step);
+const runner = new StepRunner("local/state/orders.json", steps);
+try {
+  await runner.run();
+} finally {
+  runner.close();
 }
 ```
 
-> The example above shows the composition pattern; when building the real `index.ts`, use the actual `StepRunner` exported by the copied `commons/runner.ts` (constructor takes the state-db path + parsed step list; `run()` executes, handles resume and rollback). See its header comment for the entrypoint error-handling pattern.
+> The example shows the composition pattern; when building the real `index.ts`, use the `StepRunner` exported by the copied `commons/runner.ts` (constructor takes the state-file path + parsed step list; `run()` executes, handles resume and rollback). See its header comment for the entrypoint error-handling pattern.
 
 `null` rollbacks still require an explicit Planning-time warning per the **Checkpoint & Resume** corollary — dynamic composition doesn't exempt any step from that rule.
 
@@ -104,9 +109,9 @@ Use your client's plan mode when the approach is uncertain, the change spans mul
 
 ## Validating
 
-* Validate TypeScript types: `bunx tsc --noEmit`.
-* Validate syntax with **ESLint**: `bun run lint`.
-* Write and run unit tests and integration tests, following a TDD approach: `RED` → `GREEN` → `REFACTOR`.
+* Validate TypeScript types: `npm run typecheck` (`tsc --noEmit`).
+* Validate syntax with **ESLint**: `npm run lint`.
+* Write and run unit tests and integration tests, following a TDD approach: `RED` → `GREEN` → `REFACTOR`. Tests run with `node --test`.
 * Unit tests should cover positives, negatives, edge cases, faults and error handling.
 * Integration tests should also account for failures and errors from external systems (executed commands, API calls, etc.).
 * **Unit tests** never touch the network — mock the API client/fetch call entirely, no exception.

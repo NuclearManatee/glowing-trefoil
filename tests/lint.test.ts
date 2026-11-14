@@ -1,7 +1,8 @@
-import { afterAll, describe, expect, test } from "bun:test";
+import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { after, describe, test } from "node:test";
 import type { Config } from "../plugins/script-forge/lib/config.ts";
 import { runLint } from "../plugins/script-forge/lib/lint.ts";
 
@@ -13,7 +14,7 @@ function temporaryRoot(): string {
 	return root;
 }
 
-afterAll(() => {
+after(() => {
 	for (const root of roots) {
 		rmSync(root, { recursive: true, force: true });
 	}
@@ -43,25 +44,25 @@ function baseOptions(projectDir: string) {
 describe("lint preconditions", () => {
 	test("missing package.json is an environment error", () => {
 		const root = temporaryRoot();
-		expect(() => runLint(baseOptions(root))).toThrow(/package.json/);
+		assert.throws(() => runLint(baseOptions(root)), /package.json/);
 	});
 
 	test("missing ESLint config is an environment error with a fix", () => {
 		const root = temporaryRoot();
 		writeFileSync(join(root, "package.json"), "{}\n");
-		expect(() => runLint(baseOptions(root))).toThrow(/ESLint config/);
+		assert.throws(() => runLint(baseOptions(root)), /ESLint config/);
 	});
 
 	test("missing ESLint install is an environment error", () => {
 		const root = temporaryRoot();
 		writeFileSync(join(root, "package.json"), "{}\n");
 		writeFileSync(join(root, "eslint.tooling.js"), "export default [];\n");
-		expect(() => runLint(baseOptions(root))).toThrow(/ESLint is not installed/);
+		assert.throws(() => runLint(baseOptions(root)), /ESLint is not installed/);
 	});
 
 	test("--fix requires consent", () => {
 		const root = temporaryRoot();
 		writeFileSync(join(root, "package.json"), "{}\n");
-		expect(() => runLint({ ...baseOptions(root), fix: true })).toThrow(/--yes/);
+		assert.throws(() => runLint({ ...baseOptions(root), fix: true }), /--yes/);
 	});
 });

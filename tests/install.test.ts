@@ -1,7 +1,8 @@
-import { afterAll, describe, expect, test } from "bun:test";
+import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { after, describe, test } from "node:test";
 import {
 	installCursor,
 	installOpenCode,
@@ -17,7 +18,7 @@ function temporaryHome(): string {
 	return root;
 }
 
-afterAll(() => {
+after(() => {
 	for (const root of roots) {
 		rmSync(root, { recursive: true, force: true });
 	}
@@ -29,15 +30,15 @@ describe("Cursor install", () => {
 		const result = installCursor({ homeDir: home, force: false });
 		const destination = join(home, ".cursor", "plugins", "local", "script-forge");
 
-		expect(result.paths).toEqual([destination]);
-		expect(existsSync(join(destination, ".cursor-plugin", "plugin.json"))).toBe(true);
-		expect(existsSync(join(destination, "commands-cursor", "scaffold.md"))).toBe(true);
-		expect(existsSync(join(destination, ".glowing-trefoil.json"))).toBe(true);
+		assert.deepEqual(result.paths, [destination]);
+		assert.ok(existsSync(join(destination, ".cursor-plugin", "plugin.json")));
+		assert.ok(existsSync(join(destination, "commands-cursor", "scaffold.md")));
+		assert.ok(existsSync(join(destination, ".glowing-trefoil.json")));
 
 		installCursor({ homeDir: home, force: false });
 
 		uninstallCursor({ homeDir: home, force: false });
-		expect(existsSync(destination)).toBe(false);
+		assert.equal(existsSync(destination), false);
 	});
 
 	test("refuses to overwrite a folder it does not own", () => {
@@ -46,7 +47,7 @@ describe("Cursor install", () => {
 		installCursor({ homeDir: home, force: false });
 		unlinkSync(join(destination, ".glowing-trefoil.json"));
 
-		expect(() => installCursor({ homeDir: home, force: false })).toThrow(/refusing to overwrite/);
+		assert.throws(() => installCursor({ homeDir: home, force: false }), /refusing to overwrite/);
 	});
 });
 
@@ -58,18 +59,18 @@ describe("OpenCode install", () => {
 
 		installOpenCode({ homeDir: home, force: false });
 
-		expect(existsSync(join(commandsDir, "script-forge-scaffold.md"))).toBe(true);
-		expect(existsSync(join(commandsDir, "script-forge-doctor.md"))).toBe(true);
-		expect(existsSync(join(commandsDir, "script-forge-lint.md"))).toBe(true);
-		expect(existsSync(join(skillDir, "SKILL.md"))).toBe(true);
-		expect(existsSync(join(skillDir, ".glowing-trefoil.json"))).toBe(true);
+		assert.ok(existsSync(join(commandsDir, "script-forge-scaffold.md")));
+		assert.ok(existsSync(join(commandsDir, "script-forge-doctor.md")));
+		assert.ok(existsSync(join(commandsDir, "script-forge-lint.md")));
+		assert.ok(existsSync(join(skillDir, "SKILL.md")));
+		assert.ok(existsSync(join(skillDir, ".glowing-trefoil.json")));
 
 		writeFileSync(join(commandsDir, "unrelated.md"), "keep me\n");
 		uninstallOpenCode({ homeDir: home, force: false });
 
-		expect(existsSync(join(commandsDir, "script-forge-scaffold.md"))).toBe(false);
-		expect(existsSync(join(skillDir))).toBe(false);
-		expect(readFileSync(join(commandsDir, "unrelated.md"), "utf8")).toBe("keep me\n");
+		assert.equal(existsSync(join(commandsDir, "script-forge-scaffold.md")), false);
+		assert.equal(existsSync(join(skillDir)), false);
+		assert.equal(readFileSync(join(commandsDir, "unrelated.md"), "utf8"), "keep me\n");
 	});
 
 	test("refuses to overwrite a foreign command file", () => {
@@ -80,6 +81,6 @@ describe("OpenCode install", () => {
 		uninstallOpenCode({ homeDir: home, force: false });
 		writeFileSync(target, "user file\n");
 
-		expect(() => installOpenCode({ homeDir: home, force: false })).toThrow(/refusing to overwrite/);
+		assert.throws(() => installOpenCode({ homeDir: home, force: false }), /refusing to overwrite/);
 	});
 });

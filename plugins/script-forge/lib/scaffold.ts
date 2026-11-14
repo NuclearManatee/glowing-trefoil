@@ -7,7 +7,7 @@ import type { DoctorResult } from "./doctor.ts";
 import { runDoctor } from "./doctor.ts";
 import { internalError, userError } from "./errors.ts";
 import { assetsDir, templatesDir } from "./paths.ts";
-import { bunVersion, gitVersion, runCapture, runInherit } from "./runtime.ts";
+import { npmCliPath, runNpm, gitVersion, runCapture } from "./runtime.ts";
 
 export type ScaffoldOptions = {
 	projectDir: string;
@@ -115,14 +115,15 @@ function installDependencies(targetDir: string, enabled: boolean, warnings: stri
 	if (!enabled) {
 		return { installStatus: "skipped", installMessage: "dependency install skipped (--no-install)" };
 	}
-	if (bunVersion() === null) {
-		const message = "Bun not found — install Bun 1.3.14, then run `bun install` in the workspace";
+	if (npmCliPath() === null) {
+		const message =
+			"npm not found — install Node.js 22.18+ (which includes npm), then run `npm install` in the workspace";
 		warnings.push(message);
 		return { installStatus: "skipped", installMessage: message };
 	}
-	const status = runInherit("bun", ["install"], targetDir);
+	const status = runNpm(["install"], targetDir);
 	if (status !== 0) {
-		const message = `bun install failed (exit ${status}) — run it again in ${normalizeSlashes(targetDir)}`;
+		const message = `npm install failed (exit ${status}) — run it again in ${normalizeSlashes(targetDir)}`;
 		warnings.push(message);
 		return { installStatus: "failed", installMessage: message };
 	}
@@ -197,6 +198,7 @@ export function runScaffold(options: ScaffoldOptions): ScaffoldResult {
 		join(scriptsDir, ".gitkeep"),
 		join(localDir, "tmp", ".gitkeep"),
 		join(localDir, "raw_data", ".gitkeep"),
+		join("tests", "smoke.test.ts"),
 	];
 	for (const relative of required) {
 		if (!existsSync(join(target, relative))) {
@@ -209,7 +211,7 @@ export function runScaffold(options: ScaffoldOptions): ScaffoldResult {
 	rewriteTemplateFiles(target, {
 		"{{name}}": projectName,
 		"{{eslintConfigPath}}": eslint.packagePath,
-		"{{bunPin}}": "1.3.14",
+		"{{nodePin}}": "22.18.0",
 		"{{scriptsDir}}": scriptsDir,
 		"{{localDir}}": localDir,
 	});
@@ -229,6 +231,7 @@ export function runScaffold(options: ScaffoldOptions): ScaffoldResult {
 		`${scriptsDir}/.gitkeep`,
 		`${localDir}/tmp/.gitkeep`,
 		`${localDir}/raw_data/.gitkeep`,
+		"tests/smoke.test.ts",
 	];
 	if (eslint.copied) {
 		files.push("eslint.tooling.js");

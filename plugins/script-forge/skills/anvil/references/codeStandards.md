@@ -12,7 +12,7 @@ The repository must contain the following ESLint configuration for tooling scrip
 
 ## Runtime & Architecture
 
-* Run scripts with **Bun** + **TypeScript**.
+* **Runtime.** Run scripts with **Node.js 22.18+** + **TypeScript**. The erasable-subset rules live in `SKILL.md → Node + TypeScript non-negotiables`; the rulebook is the full text. The template enables `erasableSyntaxOnly` and `verbatimModuleSyntax`, and `npm run typecheck` catches violations before runtime.
 * Untyped external data must pass through **Zod** at the ingress boundary; derive downstream types from the schema. ESLint can prohibit explicit `any`/`z.any()`, but cannot establish that every external input was correctly validated.
 * When using `Number()` for parsing, pair the parsed value with Zod validation, including an explicit `.refine((value) => !Number.isNaN(value))` where `Number()` may produce `NaN`.
 * **Fail fast** with early-exit guards, structured error logs, and non-zero exits; avoid nested error branches.

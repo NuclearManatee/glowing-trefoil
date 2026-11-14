@@ -1,10 +1,11 @@
-import { afterAll, describe, expect, test } from "bun:test";
+import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { after, describe, test } from "node:test";
 
-const root = join(import.meta.dir, "..");
+const root = join(import.meta.dirname, "..");
 const cliPath = join(root, "plugins", "script-forge", "cli", "index.ts");
 const roots: string[] = [];
 
@@ -33,7 +34,7 @@ function runCli(args: string[], homeDir: string, cwd: string = root) {
 	};
 }
 
-afterAll(() => {
+after(() => {
 	for (const directory of roots) {
 		rmSync(directory, { recursive: true, force: true });
 	}
@@ -43,16 +44,16 @@ describe("cli", () => {
 	test("version prints the package version", () => {
 		const home = temporaryRoot();
 		const result = runCli(["version"], home);
-		expect(result.status).toBe(0);
-		expect(result.stdout.trim()).toBe("1.0.0");
+		assert.equal(result.status, 0);
+		assert.equal(result.stdout.trim(), "1.0.0");
 	});
 
 	test("help prints usage", () => {
 		const home = temporaryRoot();
 		const result = runCli(["help"], home);
-		expect(result.status).toBe(0);
-		expect(result.stdout).toContain("Usage:");
-		expect(result.stdout).toContain("install <cursor|opencode>");
+		assert.equal(result.status, 0);
+		assert.ok(result.stdout.includes("Usage:"));
+		assert.ok(result.stdout.includes("install <cursor|opencode>"));
 	});
 
 	test("config reports values and their source", () => {
@@ -69,34 +70,34 @@ describe("cli", () => {
 			],
 			home,
 		);
-		expect(result.status).toBe(0);
+		assert.equal(result.status, 0);
 		const parsed = JSON.parse(result.stdout) as Record<string, { value: string; source: string }>;
-		expect(parsed.defaultNamespace?.value).toBe("tools");
-		expect(parsed.defaultNamespace?.source).toBe("default");
-		expect(parsed.scriptsDirectory?.value).toBe("claudeScripts");
-		expect(parsed.scriptsDirectory?.source).toBe("claude");
+		assert.equal(parsed.defaultNamespace?.value, "tools");
+		assert.equal(parsed.defaultNamespace?.source, "default");
+		assert.equal(parsed.scriptsDirectory?.value, "claudeScripts");
+		assert.equal(parsed.scriptsDirectory?.source, "claude");
 	});
 
 	test("an unknown command exits 1", () => {
 		const home = temporaryRoot();
 		const result = runCli(["nope"], home);
-		expect(result.status).toBe(1);
-		expect(result.stderr).toContain("unknown command");
+		assert.equal(result.status, 1);
+		assert.ok(result.stderr.includes("unknown command"));
 	});
 
 	test("an unknown install target exits 1", () => {
 		const home = temporaryRoot();
 		const result = runCli(["install", "nope"], home);
-		expect(result.status).toBe(1);
-		expect(result.stderr).toContain("unknown install target");
+		assert.equal(result.status, 1);
+		assert.ok(result.stderr.includes("unknown install target"));
 	});
 
 	test("scaffold refuses to write without --yes", () => {
 		const home = temporaryRoot();
 		const target = join(temporaryRoot(), "workspace");
 		const result = runCli(["scaffold", "smoke", "--target", target], home);
-		expect(result.status).toBe(1);
-		expect(result.stderr).toContain("--yes");
-		expect(existsSync(target)).toBe(false);
+		assert.equal(result.status, 1);
+		assert.ok(result.stderr.includes("--yes"));
+		assert.equal(existsSync(target), false);
 	});
 });

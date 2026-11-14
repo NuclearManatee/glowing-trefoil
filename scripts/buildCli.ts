@@ -1,43 +1,38 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
-const root = join(import.meta.dir, "..");
+const root = join(import.meta.dirname, "..");
+const tsc = join(root, "node_modules", "typescript", "bin", "tsc");
 const outdir = join(root, "dist");
-const entrypoint = join(root, "plugins", "script-forge", "cli", "index.ts");
+const outputPath = join(outdir, "cli", "index.js");
 
-mkdirSync(outdir, { recursive: true });
+if (!existsSync(tsc)) {
+	console.error("build failed: typescript is not installed — run `npm install`");
+	process.exit(1);
+}
 
-const result = await Bun.build({
-	entrypoints: [entrypoint],
-	outdir,
-	target: "node",
-	format: "esm",
-	minify: false,
-	sourcemap: "none",
-	naming: "cli.js",
+// Remove stale output from earlier build layouts (for example the Bun-era
+// dist/cli.js) so the package ships only the current tsc tree.
+rmSync(outdir, { recursive: true, force: true });
+
+const result = spawnSync(process.execPath, [tsc, "-p", join(root, "tsconfig.build.json")], {
+	cwd: root,
+	stdio: "inherit",
+	shell: false,
+	windowsHide: true,
 });
 
-if (!result.success) {
-	for (const log of result.logs) {
-		console.error(log);
-	}
+if (result.error !== undefined) {
+	console.error(`build failed: ${result.error.message}`);
 	process.exit(1);
 }
-
-const outputPath = join(outdir, "cli.js");
-const fallbackPath = join(outdir, "index.js");
-if (!existsSync(outputPath) && existsSync(fallbackPath)) {
-	renameSync(fallbackPath, outputPath);
+if (result.status !== 0) {
+	process.exit(result.status ?? 1);
 }
 if (!existsSync(outputPath)) {
-	console.error("build failed: dist/cli.js was not produced");
+	console.error("build failed: dist/cli/index.js was not produced");
 	process.exit(1);
 }
-
-const content = readFileSync(outputPath, "utf8");
-if (!content.startsWith("#!")) {
-	writeFileSync(outputPath, `#!/usr/bin/env node\n${content}`, "utf8");
-}
-chmodSync(outputPath, 0o755);
 
 console.log(`Built ${outputPath}`);

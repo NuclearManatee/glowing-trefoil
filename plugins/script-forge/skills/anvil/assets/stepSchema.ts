@@ -16,7 +16,7 @@ export const stepContext = z.object({
 export type StepContext = z.infer<typeof stepContext>;
 
 export const stepDef = z.object({
-	name: z.string(),                  // must match stepRow.step in the state db
+	name: z.string(),                  // must match stepRow.step in the state file
 	run: z.function().input([stepContext]).output(z.promise(z.void())),
 	rollback: z.string().nullable(),   // description of compensating action, or null
 	rollbackFn: z.function().input([stepContext]).output(z.promise(z.void())).nullable(),

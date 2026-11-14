@@ -5,23 +5,23 @@
 ## Data I/O
 
 * **Boundary Validation:** Every dataset read from disk, stream, or remote API must pass through a **Zod** schema at the ingress boundary. Derive downstream types directly via `z.infer`.
-* **Dates & Timezones:** Use the native global **`Temporal`** API for all date arithmetic, duration parsing, and ISO/timezone formatting. External date libraries (`dayjs`, `date-fns`) are prohibited. This requires the `@js-temporal/polyfill` global patch described in **Tech Stack → Pre-authorized** until the pinned Bun version ships native support.
+* **Dates & Timezones:** Use the native global **`Temporal`** API for all date arithmetic, duration parsing, and ISO/timezone formatting. External date libraries (`dayjs`, `date-fns`) are prohibited. This requires the `@js-temporal/polyfill` global patch described in **Tech Stack → Pre-authorized** until Node ships native support.
 * **Standardized Ingress/Egress:** Read raw datasets from `<localDir>/raw_data/<scriptname>/` (default `local/raw_data/`) or explicit CLI flags. Within that folder:
   * `<localDir>/raw_data/<scriptname>/input/` — untouched source dumps, immutable once dropped.
   * `<localDir>/raw_data/<scriptname>/archive/` — *(optional)* prior runs' inputs, for recurring scripts that need to diff or reprocess earlier drops.
   * Moving files from `input/` to `archive/` is a **Planning-time decision**: the plan must state whether this is done manually by the user or automatically by the script at a defined point in the run. The chosen lifecycle must be documented in the script's README **Requirements** section.
-  Output transformed datasets to dedicated build directories or SQLite databases (`bun:sqlite`), never into `<localDir>/raw_data/`, avoiding root-level file dumps.
-* **Memory-Conscious Ingress:** Avoid loading large files into memory using full `readFile` operations. Process line-by-line using Node/Bun readable streams or chunked batch iteration.
+  Output transformed datasets to dedicated build directories or analytical files (JSONL, CSV, Parquet), never into `<localDir>/raw_data/`, avoiding root-level file dumps. Do not use `node:sqlite` on Node 22: it is experimental and warns at runtime.
+* **Memory-Conscious Ingress:** Avoid loading large files into memory using full `readFile` operations. Process line-by-line using Node readable streams or chunked batch iteration.
 
 ## Handling Files
 
-* **CSV:** Parse using line streaming or Bun string parsing. Any CSV that is not explicitly guaranteed comma-clean must use a quote-aware parser (a small hand-rolled state machine is acceptable; Bun has no native CSV parser). The naive `split(",")` approach is permitted only as a documented fast path for trusted delimiter-only input.
+* **CSV:** Parse using line streaming or plain string parsing. Any CSV that is not explicitly guaranteed comma-clean must use a quote-aware parser (a small hand-rolled state machine is acceptable; Node has no native CSV parser). The naive `split(",")` approach is permitted only as a documented fast path for trusted delimiter-only input.
 * **Excel (`.xlsx`):** Read and write workbooks using `exceljs`.
 * **Word (`.docx`):** Use `mammoth` to convert incoming `.docx` files straight to Markdown/HTML before passing context to an LLM or database. Use `docx` when generating Word output.
 * **PowerPoint (`.pptx`):** Unzip the file buffer natively (or via lightweight `fflate`) and extract slide text from XML tags (`<a:t>`). Do not pull in heavy or unmaintained PowerPoint libraries.
 * **PDF:** Extract text streams using `pdf-parse`. For PDF output generation, convert content to HTML/Markdown first and print via Playwright (`page.pdf()`).
 * **Email (`.eml` / `.msg`):** Parse email files into structured objects via `mailparser` or `@kenjiuno/msgreader`, validating the output payload with Zod.
-* **HTML:** Use Bun's native `HTMLRewriter` for fast streaming tag and text extraction. Fall back to `cheerio` only when complex CSS query selectors are required.
+* **HTML:** Use `cheerio` for HTML parsing and CSS selector traversal. For very large documents, use its `htmlparser2` streaming parser; Node has no native `HTMLRewriter`.
 
 ## LLMs
 
@@ -86,7 +86,7 @@
   ```ts
   import { generateText } from "ai";
   import { openai } from "@ai-sdk/openai";
-  import { loadPrompt } from "../commons/loadPrompt";
+  import { loadPrompt } from "../commons/loadPrompt.ts";
 
   const { meta, render } = await loadPrompt("assets/prompts/summarize.md");
 
@@ -102,7 +102,7 @@
 
 ## Networking
 
-* Use **hono** to handle webhook workflows.
+* Use **hono** with `@hono/node-server` (or `node:http`) to handle webhook workflows.
 * **Reachability**: Working with webhooks needs a tunnel. Address this as a required operational step during Planning using ngrok.
 * **Signature verification**: HMAC/signature check on incoming payloads (Stripe-Signature, X-Hub-Signature-256, etc.) is mandatory.
 * **No Naked Data** applies to recieving payloads too.

@@ -8,15 +8,15 @@ The intended recipient is a coding agent.
 
 ## Tech Stack
 
-* Run with **Bun** + **TypeScript**.
-* ⚠️ Run with **as little dependencies as possible**. Every library installed outside Bun core must be **authorized and strongly motivated**.
+* Run with **Node.js 22.18+** + **TypeScript**.
+* ⚠️ Run with **as little dependencies as possible**. Every library installed outside the Node standard library must be **authorized and strongly motivated**.
 
 ### Must-have
 
 Always present, no per-script justification needed:
 
 * **`zod`** — typechecking and data validation at every step.
-* **`bun test`** (built-in) — unit and integration testing, no install.
+* **`node --test`** (built-in) — unit and integration testing, no install.
 
 ### Pre-authorized
 
@@ -26,27 +26,29 @@ Already vetted — bring in only when the trigger condition applies, no need to 
 * **`p-limit`** — plain concurrency caps for bounded parallel for-loops.
 * **`bottleneck`** — resource/weight-based rate limiting (e.g. LLM token budgets), when a plain concurrency cap isn't enough.
 * **`ai`, `@ai-sdk/provider` & provider adaptors** (`@ai-sdk/openai`, `@ai-sdk/anthropic`, etc.) — for LLM orchestration. **Scope constraint:** Restricted strictly to core completion primitives (`generateText`, `generateObject`, `streamText`, `streamObject`, `embed`, `embedMany` + single-turn `tools`). UI hooks, full agent frameworks (e.g. LangGraph or similar graph/agent orchestration libraries), or extra runtime abstractions are forbidden without explicit authorization.
-* **`exceljs`** — when reading or writing multi-sheet or styled Excel workbooks (`.xlsx`). (Plain `.csv` uses Bun native parsing).
+* **`exceljs`** — when reading or writing multi-sheet or styled Excel workbooks (`.xlsx`). (Plain `.csv` uses a line or string parser).
 * **`mammoth`** — for reading Word documents (`.docx`) and converting text directly to clean Markdown/HTML for downstream parsing or LLM ingestion.
 * **`docx`** — for programmatically generating or writing Word files (`.docx`).
 * **`pdf-parse`** — for extracting UTF-8 text streams from PDF documents.
-* **`@js-temporal/polyfill`** — required until the pinned Bun version ships native `Temporal`; pin that Bun version in `package.json` via `engines.bun`. Import the polyfill once at the script entrypoint (`import "@js-temporal/polyfill";`) so it patches the global before any step code runs. Drop this dependency and import as soon as the pinned Bun version has native support; track that removal as a standing cleanup item.
+* **`@js-temporal/polyfill`** — required until Node ships native `Temporal`; pin the Node version in `package.json` via `engines.node`. Import the polyfill once at the script entrypoint (`import "@js-temporal/polyfill";`) so it patches the global before any step code runs. Drop this dependency and import as soon as the pinned Node version has native support; track that removal as a standing cleanup item.
 * **`mailparser`** (`.eml`) / **`@kenjiuno/msgreader`** (`.msg`) — for parsing raw MIME and Outlook email files into structured JSON.
 * **`sharp`** — when images must be resized, cropped, or converted prior to multimodal/vision LLM ingestion.
-* **`hono`** — lightweight HTTP server running natively on Bun when a script must receive or process webhooks.
-* **`cheerio`** — when complex CSS selector traversal or deep DOM querying over static HTML is required (otherwise use Bun native `HTMLRewriter`).
+* **`hono`** — lightweight HTTP server running on Node via `@hono/node-server` when a script must receive or process webhooks.
+* **`cheerio`** — for HTML parsing and CSS selector traversal. Use its `htmlparser2` streaming parser for very large documents; Node has no native `HTMLRewriter`.
 
 Anything outside these lists still needs Planning-time authorization and motivation.
 
 ### Development dependencies
 
-Every tooling-script project must have these ESLint development dependencies:
+Every tooling-script project must have these development dependencies:
 
 * **`eslint`**
 * **`@typescript-eslint/eslint-plugin`**
 * **`@typescript-eslint/parser`**
 * **`@stylistic/eslint-plugin`**
 * **`eslint-plugin-unicorn`**
+* **`typescript`**
+* **`@types/node`**
 
 These belong in `devDependencies`, not runtime `dependencies`.
 
@@ -234,6 +236,11 @@ export default [
 							message:
 								"External date libraries are prohibited; use native global `Temporal`.",
 						},
+						{
+							group: ["bun", "bun:*", "node:sqlite"],
+							message:
+								"Use Node standard APIs; Bun modules are unavailable and `node:sqlite` is experimental on Node 22.",
+						},
 					],
 				},
 			],
@@ -294,11 +301,61 @@ export default [
 					message:
 						"Do not read `.env` as a file. Use `process.env`.",
 				},
+
+				// TypeScript syntax that Node's type stripping cannot transform.
 				{
-					selector:
-						"CallExpression[callee.type='MemberExpression'][callee.object.name='Bun'][callee.property.name='file'][arguments.0.value='.env']",
+					selector: "TSEnumDeclaration",
 					message:
-						"Do not read `.env` as a file. Use `process.env`.",
+						"Use a const object plus a union type; Node's type stripping cannot transform enums.",
+				},
+				{
+					selector: "TSModuleDeclaration[kind='namespace']",
+					message:
+						"Avoid namespaces; use modules. Node's type stripping cannot transform namespaces with runtime code.",
+				},
+				{
+					selector: "TSParameterProperty",
+					message:
+						"Assign constructor parameters explicitly; Node's type stripping cannot transform parameter properties.",
+				},
+				{
+					selector: "TSImportEqualsDeclaration",
+					message:
+						"Use standard ESM imports; Node's type stripping cannot transform import aliases.",
+				},
+				{
+					selector: "Decorator",
+					message:
+						"Decorators are not supported by Node's type stripping.",
+				},
+
+				// Bun and other non-Node runtime APIs.
+				{
+					selector: "MemberExpression[object.name='Bun']",
+					message:
+						"Bun APIs are unavailable; use Node APIs.",
+				},
+				{
+					selector: "NewExpression[callee.name='HTMLRewriter']",
+					message:
+						"HTMLRewriter is unavailable in Node; use cheerio.",
+				},
+				{
+					selector: "ImportExpression[source.value=/^bun:/]",
+					message:
+						"Bun modules are unavailable; use Node standard APIs.",
+				},
+				{
+					selector: "ImportExpression[source.value='node:sqlite']",
+					message:
+						"`node:sqlite` is experimental on Node 22; use a JSON file or an analytical format.",
+				},
+
+				// Bun-only path helpers.
+				{
+					selector: "MemberExpression[object.type='MetaProperty'][property.name='dir']",
+					message:
+						"Use `import.meta.dirname`.",
 				},
 			],
 		},
@@ -306,9 +363,33 @@ export default [
 ];
 ```
 
+### Node TypeScript constraints
+
+Node executes TypeScript by stripping types, not transforming them. Stay inside
+the erasable subset or the script fails at startup:
+
+* No `enum`, `namespace` with runtime code, parameter properties, import
+  aliases, decorators, or `.tsx`.
+* Every relative import ends in `.ts`; type-only imports and re-exports use
+  `import type` / `export type`.
+* `tsconfig.json` `paths` are not applied; use relative imports or `#` subpath
+  imports.
+* Node never type-checks. `tsc --noEmit` (or `npm run typecheck`) is the type
+  checker. The template enables `erasableSyntaxOnly` and
+  `verbatimModuleSyntax`, so typecheck catches unsupported syntax before
+  runtime.
+* Tests run with `node --test`, never `bun test`.
+* `.env` is loaded when the script alias is prefixed with
+  `node --env-file-if-exists=.env`; never read it as a file.
+* Do not use `Bun.*`, `bun:*`, `HTMLRewriter`, or `import.meta.dir`; use the
+  Node equivalents (`process.env`, `node:` modules, `cheerio`,
+  `import.meta.dirname`).
+* Do not use `node:sqlite` on Node 22; it is experimental and warns at runtime.
+  The checkpoint runner uses a JSON state file instead.
+
 ### Runtime & Architecture
 
-* Run scripts with **Bun** + **TypeScript**.
+* Run scripts with **Node.js 22.18+** + **TypeScript**.
 * Untyped external data must pass through **Zod** at the ingress boundary; derive downstream types from the schema. ESLint can prohibit explicit `any`/`z.any()`, but cannot establish that every external input was correctly validated.
 * When using `Number()` for parsing, pair the parsed value with Zod validation, including an explicit `.refine((value) => !Number.isNaN(value))` where `Number()` may produce `NaN`.
 * **Fail fast** with early-exit guards, structured error logs, and non-zero exits; avoid nested error branches.
@@ -381,22 +462,22 @@ Uncaught import-time failures can occur before the script can apply this taxonom
 ### Data I/O
 
 * **Boundary Validation:** Every dataset read from disk, stream, or remote API must pass through a **Zod** schema at the ingress boundary. Derive downstream types directly via `z.infer`.
-* **Dates & Timezones:** Use the native global **`Temporal`** API for all date arithmetic, duration parsing, and ISO/timezone formatting. External date libraries (`dayjs`, `date-fns`) are prohibited. This requires the `@js-temporal/polyfill` global patch described in **Tech Stack → Pre-authorized** until the pinned Bun version ships native support.
+* **Dates & Timezones:** Use the native global **`Temporal`** API for all date arithmetic, duration parsing, and ISO/timezone formatting. External date libraries (`dayjs`, `date-fns`) are prohibited. This requires the `@js-temporal/polyfill` global patch described in **Tech Stack → Pre-authorized** until Node ships native support.
 * **Standardized Ingress/Egress:** Read raw datasets from `local/raw_data/<scriptname>/` or explicit CLI flags. Within that folder:
   * `local/raw_data/<scriptname>/input/` — untouched source dumps, immutable once dropped.
   * `local/raw_data/<scriptname>/archive/` — *(optional)* prior runs' inputs, for recurring scripts that need to diff or reprocess earlier drops.
   * Moving files from `input/` to `archive/` is a **Planning-time decision**: the plan must state whether this is done manually by the user or automatically by the script at a defined point in the run. The chosen lifecycle must be documented in the script's README **Requirements** section.
-  Output transformed datasets to dedicated build directories or SQLite databases (`bun:sqlite`), never into `local/raw_data/`, avoiding root-level file dumps.
-* **Memory-Conscious Ingress:** Avoid loading large files into memory using full `readFile` operations. Process line-by-line using Node/Bun readable streams or chunked batch iteration.
+  Output transformed datasets to dedicated build directories or analytical files (JSONL, CSV, Parquet), never into `local/raw_data/`, avoiding root-level file dumps. Do not use `node:sqlite` on Node 22: it is experimental and warns at runtime.
+* **Memory-Conscious Ingress:** Avoid loading large files into memory using full `readFile` operations. Process line-by-line using Node readable streams or chunked batch iteration.
 
 ### Handling Files
-* **CSV:** Parse using line streaming or Bun string parsing. Any CSV that is not explicitly guaranteed comma-clean must use a quote-aware parser (a small hand-rolled state machine is acceptable; Bun has no native CSV parser). The naive `split(",")` approach is permitted only as a documented fast path for trusted delimiter-only input.
+* **CSV:** Parse using line streaming or plain string parsing. Any CSV that is not explicitly guaranteed comma-clean must use a quote-aware parser (a small hand-rolled state machine is acceptable; Node has no native CSV parser). The naive `split(",")` approach is permitted only as a documented fast path for trusted delimiter-only input.
 * **Excel (`.xlsx`):** Read and write workbooks using `exceljs`.
 * **Word (`.docx`):** Use `mammoth` to convert incoming `.docx` files straight to Markdown/HTML before passing context to an LLM or database. Use `docx` when generating Word output.
 * **PowerPoint (`.pptx`):** Unzip the file buffer natively (or via lightweight `fflate`) and extract slide text from XML tags (`<a:t>`). Do not pull in heavy or unmaintained PowerPoint libraries.
 * **PDF:** Extract text streams using `pdf-parse`. For PDF output generation, convert content to HTML/Markdown first and print via Playwright (`page.pdf()`).
 * **Email (`.eml` / `.msg`):** Parse email files into structured objects via `mailparser` or `@kenjiuno/msgreader`, validating the output payload with Zod.
-* **HTML:** Use Bun's native `HTMLRewriter` for fast streaming tag and text extraction. Fall back to `cheerio` only when complex CSS query selectors are required.
+* **HTML:** Use `cheerio` for HTML parsing and CSS selector traversal. For very large documents, use its `htmlparser2` streaming parser; Node has no native `HTMLRewriter`.
 
 ### LLMs
 
@@ -472,7 +553,7 @@ Uncaught import-time failures can occur before the script can apply this taxonom
   ```
 
 ### Networking
-* Use **hono** to handle webhook workflows.
+* Use **hono** with `@hono/node-server` (or `node:http`) to handle webhook workflows.
 * **Reachability**: Working with webhooks needs a tunnel. Address this as a required operational step during Planning using ngrok.
 * **Signature verification**: HMAC/signature check on incoming payloads (Stripe-Signature, X-Hub-Signature-256, etc.) is mandatory.
 * **No Naked Data** applies to recieving payloads too.
@@ -485,10 +566,10 @@ Uncaught import-time failures can occur before the script can apply this taxonom
 * `defaultNamespace` (default `tools`) — the `<namespace>:<scriptname>` alias namespace used when registering scripts in `package.json` (see Scaffolding → Proper scripts).
 * `scaffoldDirectory` (default: the current working directory) — absolute path where the `scaffold` command creates new workspaces. Empty = wherever the command runs.
 * `scriptsDirectory` (default `scripts`) — workspace-relative directory where proper scripts live.
-* `localDirectory` (default `local`) — workspace-relative scratch root; the `tmp/` (temp-tools) and `raw_data/` (No Naked Data) children hang off it.
+* `localDirectory` (default `local`) — workspace-relative scratch root; the `tmp/` (temp-tools), `raw_data/` (No Naked Data), and `state/` (checkpoint files) children hang off it.
 * `esLintConfigLocation` (default: `<project>/eslint.tooling.js`, the project-local copy written by scaffold) — absolute path to a custom ESLint flat config. Scaffold copies the plugin asset `assets/eslint.tooling.js` into the project so its imports resolve from the project's `node_modules`; a custom config resolves its own imports relative to its own location.
 
-Throughout this rulebook, `scripts/`, `local/tmp`, `local/raw_data`, and `scripts/<scriptname>/` mean the **configured** directories — in skill and command docs they are written as `<scriptsDir>`, `<localDir>`, and `<namespace>`, with the defaults above when a key is unset or empty.
+Throughout this rulebook, `scripts/`, `local/tmp`, `local/raw_data`, `local/state`, and `scripts/<scriptname>/` mean the **configured** directories — in skill and command docs they are written as `<scriptsDir>`, `<localDir>`, and `<namespace>`, with the defaults above when a key is unset or empty.
 
 ### LLM provider & model — asked at runtime
 
@@ -504,6 +585,7 @@ Prompt files carry a `model:` in their frontmatter. There is **no config default
 * Raw datasets are dropped into `local/raw_data` (gitignored) — see **No Naked Data**.
 * You may decide to promote a temp-tool into a proper script (see below). If so, propose it to the User first.
 * Treat `local/tmp` as fully disposable — no persistence guarantee, no mid-session cleanup ceremony.
+* Checkpoint state is not kept in `local/tmp`: the runner writes it under `local/state/`, which is gitignored and survives `local/tmp` sweeps (see **Checkpoint & Resume**).
 * On promotion to `scripts/`, delete the temp-tool version in the same commit — Clean Kitchen applies to the file's own lifecycle too.
 * At the start of a new planning session, sweep `local/tmp` of anything not referenced by the current task — judgment call, no fixed TTL.
 * If something in `local/tmp` needs to survive across sessions, that's a signal to either promote it or log the reason to the client's persistent memory when available — not leave it implicit.
@@ -518,15 +600,16 @@ scripts/<scriptname>/
 ├── commons/                # functions shared across steps
 ├── steps/                  # one .ts file per step (or a generic file for dynamically-generated steps)
 ├── tests/
-│   ├── bun/                 # unit + integration tests (*.test.ts)
+│   ├── node/                # unit + integration tests (*.test.ts)
 │   ├── playwright/          # optional, e2e tests
-│   └── fixtures/            # shared by bun test and playwright
+│   └── fixtures/            # shared by node --test and playwright
 ├── assets/
 │   └── prompts/             # optional, LLM prompt files (see LLMs → Prompt Files)
 └── README.md               # required, see Documentation
 ```
 
-* Reference every script in `package.json` as `<namespace>:<scriptname>` and run it from there with **Bun**, e.g. `"tools:ordersSummary": "bun run scripts/ordersSummary/index.ts"` → `bun run tools:ordersSummary`. `<namespace>` groups scripts by domain (e.g. `tools`, `reports`) — reuse an existing namespace when the script fits one, don't mint a new one per script.
+* Reference every script in `package.json` as `<namespace>:<scriptname>` and run it from there with **npm**, e.g. `"tools:ordersSummary": "node --env-file-if-exists=.env scripts/ordersSummary/index.ts"` → `npm run tools:ordersSummary`. `<namespace>` groups scripts by domain (e.g. `tools`, `reports`) — reuse an existing namespace when the script fits one, don't mint a new one per script.
+* The workspace template ships `tests/smoke.test.ts` so `npm test` is green before the first script exists; script-specific tests live under `<scriptsDir>/<scriptname>/tests/node/`.
 
 ## Step Orchestration
 
@@ -538,16 +621,16 @@ scripts/<scriptname>/
 import { z } from "zod";
 
 export const stepContext = z.object({
-  get: z.function().args(z.string()).returns(z.unknown()),
-  set: z.function().args(z.string(), z.unknown()).returns(z.void()),
+  get: z.function().input([z.string()]).output(z.unknown()),
+  set: z.function().input([z.string(), z.unknown()]).output(z.void()),
 });
 export type StepContext = z.infer<typeof stepContext>;
 
 export const stepDef = z.object({
-  name: z.string(),                  // must match stepRow.step in the state db
-  run: z.function().args(stepContext).returns(z.promise(z.void())),
+  name: z.string(),                  // must match stepRow.step in the state file
+  run: z.function().input([stepContext]).output(z.promise(z.void())),
   rollback: z.string().nullable(),   // description of compensating action, or null
-  rollbackFn: z.function().args(stepContext).returns(z.promise(z.void())).nullable(),
+  rollbackFn: z.function().input([stepContext]).output(z.promise(z.void())).nullable(),
 });
 export type StepDef = z.infer<typeof stepDef>;
 
@@ -557,9 +640,9 @@ export const stepList = z.array(stepDef).min(1);
 **Dynamic composition — conditional step + loop-generated steps** (`index.ts`):
 
 ```ts
-import { stepList } from "./commons/stepSchema";
-import { fetchStep, validateStep, enrichStep, writeStep, perRegionStep } from "./steps";
-import { runStep } from "./commons/runner"; // wraps Checkpoint & Resume sqlite logic
+import { stepList } from "./commons/stepSchema.ts";
+import { StepRunner } from "./commons/runner.ts";
+import { fetchStep, validateStep, enrichStep, writeStep, perRegionStep } from "./steps/index.ts";
 
 const needsEnrichment = process.env.ENRICH === "1";
 const regions = ["eu", "us", "apac"];
@@ -579,10 +662,15 @@ const steps = stepList.parse([
   { name: "write_summary", run: writeStep, rollback: null, rollbackFn: null },
 ]);
 
-for (const step of steps) {
-  await runStep(step);
+const runner = new StepRunner("local/state/orders.json", steps);
+try {
+  await runner.run();
+} finally {
+  runner.close();
 }
 ```
+
+Map failures to the exit-code taxonomy from the `runner.ts` header (`RunError.category`); `finally` always closes the runner.
 
 `null` rollbacks still require an explicit Planning-time warning per the **Checkpoint & Resume** corollary — dynamic composition doesn't exempt any step from that rule.
 
@@ -631,12 +719,12 @@ Always follow these principles, to the letter.
 
 > Never let raw data reach the coding assistant's own context: while investigating or debugging, build TypeScript scripts that read the full dataset but print only anonymized statistics back to the terminal.
 
-> ⚠️ This principle applies specifically to the coding assistant's context (e.g., terminal output, file reads during development), not to every LLM call executed by a running script. It also covers error objects and stack traces: sanitize them before logging and never dump raw rows from catch blocks. Local SQLite inspection must use the same stats-only script pattern; never run raw `sqlite3 ... select *` output into the assistant's context. Local/self-hosted LLM calls are exempt from external-vendor privacy scrutiny, but not from the terminal/context exposure rule. Refer to **Domain Patterns → LLM Integration & Orchestration** for handling LLMs in scripts.
+> ⚠️ This principle applies specifically to the coding assistant's context (e.g., terminal output, file reads during development), not to every LLM call executed by a running script. It also covers error objects and stack traces: sanitize them before logging and never dump raw rows from catch blocks. Local database inspection must use the same stats-only script pattern; never run raw `sqlite3 ... select *` output into the assistant's context. Local/self-hosted LLM calls are exempt from external-vendor privacy scrutiny, but not from the terminal/context exposure rule. Refer to **Domain Patterns → LLM Integration & Orchestration** for handling LLMs in scripts.
 
 **✅ GOOD — scripts only, stats out**
 
 ```ts
-// local/tmp/ordersSummary.ts — run with: bun run local/tmp/ordersSummary.ts
+// local/tmp/ordersSummary.ts — run with: node local/tmp/ordersSummary.ts
 // The script reads the dump, but only anonymized statistics reach the screen (and the assistant).
 // This illustrative example assumes a small, size-bounded file; unknown or large inputs must use streaming/chunked ingestion.
 import { readFile } from "node:fs/promises";
@@ -720,7 +808,7 @@ await writeFile("debug.json", JSON.stringify(rows)); // 💩 dumped, never clean
 
 > Multi-step scripts persist state per step and are re-runnable from any step. Every side effect is logged with its own compensating (rollback) action — or an explicit `null` if none exists — so a failed run can be resumed or unwound without guesswork.
 
-**State store** — one `bun:sqlite` file per script run (WAL mode), not flat JSON: transactions make checkpoint writes atomic, and parallel steps can write without a hand-rolled file lock. This is a run-state database, separate from any `bun:sqlite` output database the script writes under **Domain Patterns → Data Reading & Writing**. A table row per step, minimally:
+**State store** — one JSON file per script run, not a database: the runner writes each checkpoint to a temporary file, fsyncs it, and renames it over the state file, so a crash cannot leave a half-written checkpoint. The runner is the only writer, so no file lock is needed. Store it under `<localDir>/state/` (default `local/state/`), which is gitignored and survives `local/tmp` sweeps; this is a run-state file, separate from any output files the script writes under **Domain Patterns → Data I/O**. A row per step, minimally:
 
 ```ts
 const stepRow = z.object({
@@ -733,13 +821,13 @@ const stepRow = z.object({
 
 ```
 
-**Resume** — resume happens in a fresh process. No step may assume in-memory continuity: required inputs must either be re-derived from source/build output or be persisted in the state's `action` field as JSON and re-read on resume. On start, read the table; skip steps marked `done`, restart from the first `pending` or `failed` row.
+**Resume** — resume happens in a fresh process. No step may assume in-memory continuity: required inputs must either be re-derived from source/build output or be persisted in the state's `action` field as JSON and re-read on resume. On start, read the state file; skip steps marked `done`, restart from the first `pending` or `failed` row.
 
-**Dynamic step reconciliation** — on resume, rows in the state DB with no matching step in the current composition are flagged as **orphaned** and require explicit confirmation before proceeding. Steps present in the current composition with no DB row start fresh as `pending`.
+**Dynamic step reconciliation** — on resume, rows in the state file with no matching step in the current composition are flagged as **orphaned** and require explicit confirmation before proceeding. Steps present in the current composition with no state row start fresh as `pending`.
 
 **Rollback (the Corollary, made concrete)** — on failure, replay `done` rows in reverse. If the current step definition provides `rollbackFn`, invoke it; otherwise surface the descriptive `rollback` string as a required manual action for the operator. A `null` rollback is not a silent gap: it's a recorded fact Planning can check for — any step with `rollback: null` must carry an explicit warning raised during Planning, per the Implementing corollary.
 
-**Torn state & idempotency** — mark a step `done` only after its local write/checkpoint succeeds. Every step that performs an external side effect must be idempotent or use a check-before-act strategy that queries the external system for an existing effect, so a resume retry after a torn state cannot duplicate the side effect.
+**Torn state & idempotency** — mark a step `done` only after the atomic state write succeeds. Every step that performs an external side effect must be idempotent or use a check-before-act strategy that queries the external system for an existing effect, so a resume retry after a torn state cannot duplicate the side effect.
 
 ### 🚫 Eval is Banned
 
@@ -758,7 +846,7 @@ ls local/tmp
 # 2. Shell work — PowerShell for structured/Windows-specific cases (not shown)
 
 # 3. Real data crunching → write a temp-tool (see No Naked Data):
-bun run local/tmp/extractStats.ts
+node local/tmp/extractStats.ts
 
 ```
 
@@ -766,7 +854,7 @@ bun run local/tmp/extractStats.ts
 
 ```bash
 # 🚫 The raw dump (PII and all) passes straight through to the assistant's context.
-bun -e "console.log(require('fs').readFileSync('local/raw_data/orders.csv', 'utf8'))"
+node -e "console.log(require('fs').readFileSync('local/raw_data/orders.csv', 'utf8'))"
 
 ```
 
@@ -784,12 +872,12 @@ python -c "print(len(open('local/raw_data/orders.csv').readlines()))"
 
 ### 🔒 Never Read `.env`
 
-> Secrets never enter the session: `.env` is never read as a file — the pinned Bun version (see `engines.bun` in **Tech Stack**) auto-loads it, so config comes from `process.env`.
+> Secrets never enter the session: `.env` is never read as a file — prefix the script alias with `node --env-file-if-exists=.env` (see **Tech Stack**), so config comes from `process.env`.
 
 **✅ GOOD — config via process.env**
 
 ```ts
-const apiToken = process.env.API_TOKEN; // Bun loads .env automatically
+const apiToken = process.env.API_TOKEN; // loaded by --env-file-if-exists
 
 ```
 
@@ -841,9 +929,9 @@ Use your client's plan mode when the approach is uncertain, the change spans mul
 
 ### Validating
 
-* Validate TypeScript types: `bunx tsc --noEmit`.
-* Validate syntax with **ESLint**: `bun run lint`.
-* Write and run unit tests and integration tests, following a TDD approach: `RED` → `GREEN` → `REFACTOR`.
+* Validate TypeScript types: `npm run typecheck` (`tsc --noEmit`).
+* Validate syntax with **ESLint**: `npm run lint`.
+* Write and run unit tests and integration tests, following a TDD approach: `RED` → `GREEN` → `REFACTOR`. Tests run with `node --test`.
 * Unit tests should cover positives, negatives, edge cases, faults and error handling.
 * Integration tests should also account for failures and errors from external systems (executed commands, API calls, etc.).
 * **Unit tests** never touch the network — mock the API client/fetch call entirely, no exception.

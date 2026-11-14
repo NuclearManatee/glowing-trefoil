@@ -1,10 +1,11 @@
 # Install
 
 One path per harness. Every command runs the same CLI through
-`npx -y glowing-trefoil <command>`, so nothing needs a global binary, a
-`bun link`, or a plugin-local `node_modules`.
+`npx -y glowing-trefoil <command>`, so nothing needs a global binary, an
+`npm link`, or a plugin-local `node_modules`.
 
-Prerequisite for every harness: **Node 22+** at command time.
+Prerequisite for every harness: **Node 22.18+** at command time (npm is
+included with Node).
 
 ## Claude Code
 
@@ -45,9 +46,8 @@ no top-level `bin/`, no `package.json`, and no `node_modules`.
 - Project overrides go in `.script-forge.json` in the connected folder.
 - The sandbox has Node/npm and an allowlisted npm registry, so
   `npx -y glowing-trefoil ...` works.
-- Bun is not guaranteed. `scaffold` creates the workspace and skips
-  `bun install`, printing the command to run once Bun is available. `doctor`
-  reports the missing Bun as a failure.
+- Generated workspaces use the same Node/npm runtime; `scaffold` runs
+  `npm install` and never needs Bun.
 
 Verify: `/script-forge:scaffold` appears and a scaffold task runs.
 
@@ -145,8 +145,8 @@ npx -y glowing-trefoil config --json
 
 ## Requirements and limits
 
-- **Node 22+** is required for the CLI on every harness.
-- **Bun 1.3.14** is required to install and run a generated workspace.
+- **Node 22.18+** is required for the CLI and for every generated workspace.
+- **npm** (bundled with Node) installs workspace dependencies.
 - `npx` needs network access on first run; later runs use the npm cache.
 - Claude `userConfig` values are interpolated into a shell command as JSON in
   single quotes. Values containing single quotes are unsupported.

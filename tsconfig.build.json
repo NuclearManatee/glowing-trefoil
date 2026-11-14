@@ -1,0 +1,14 @@
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"noEmit": false,
+		"outDir": "dist",
+		"rootDir": "plugins/script-forge",
+		"declaration": false,
+		"sourceMap": false
+	},
+	"include": [
+		"plugins/script-forge/cli/**/*.ts",
+		"plugins/script-forge/lib/**/*.ts"
+	]
+}

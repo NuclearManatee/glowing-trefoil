@@ -29,8 +29,8 @@ generated; do not edit them by hand.
 - `assets/eslint.tooling.js` — the rulebook ESLint config; `scaffold` copies it
   into the project so its imports resolve from the project's `node_modules`.
 - `templates/` — the blank workspace skeleton.
-- `cli/` and `lib/` — the Node-compatible CLI source (bundled to
-  `dist/cli.js`).
+- `cli/` and `lib/` — the Node-compatible CLI source (compiled to
+  `dist/cli/index.js`).
 
 There is no `bin/`, `package.json`, or `node_modules/` here by design: Cowork
 rejects plugins with a top-level `bin/`, and the CLI carries its own
@@ -55,10 +55,10 @@ Full contract: `skills/anvil/references/config.md`.
   Claude Code: `claude plugin list`. Cursor: re-run
   `npx -y glowing-trefoil install cursor`. OpenCode: re-run
   `npx -y glowing-trefoil install opencode`.
-- **`npx` cannot download:** check Node 22+ and network access to the npm
+- **`npx` cannot download:** check Node 22.18+ and network access to the npm
   registry.
-- **`scaffold` skipped install:** Bun is missing; install `1.3.14` and run
-  `bun install` in the workspace.
+- **`scaffold` skipped install:** npm is missing; install Node 22.18+ and run
+  `npm install` in the workspace.
 - **Lint complains about the config:** the project copy must exist at
   `<project>/eslint.tooling.js` (or set `esLintConfigLocation`); run
   `scaffold --force --yes` or copy the asset.

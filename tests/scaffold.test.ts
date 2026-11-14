@@ -1,9 +1,10 @@
-import { afterAll, describe, expect, test } from "bun:test";
+import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runScaffold } from "../plugins/script-forge/lib/scaffold.ts";
+import { after, describe, test } from "node:test";
 import type { Config } from "../plugins/script-forge/lib/config.ts";
+import { runScaffold } from "../plugins/script-forge/lib/scaffold.ts";
 
 const roots: string[] = [];
 
@@ -13,7 +14,7 @@ function temporaryRoot(): string {
 	return root;
 }
 
-afterAll(() => {
+after(() => {
 	for (const root of roots) {
 		rmSync(root, { recursive: true, force: true });
 	}
@@ -50,27 +51,31 @@ describe("scaffold", () => {
 		const target = join(root, "workspace");
 		const result = scaffold(target);
 
-		expect(result.installStatus).toBe("skipped");
-		expect(existsSync(join(target, "package.json"))).toBe(true);
-		expect(existsSync(join(target, "eslint.tooling.js"))).toBe(true);
-		expect(existsSync(join(target, "scripts", ".gitkeep"))).toBe(true);
-		expect(existsSync(join(target, "local", "tmp", ".gitkeep"))).toBe(true);
-		expect(existsSync(join(target, "local", "raw_data", ".gitkeep"))).toBe(true);
+		assert.equal(result.installStatus, "skipped");
+		assert.ok(existsSync(join(target, "package.json")));
+		assert.ok(existsSync(join(target, "eslint.tooling.js")));
+		assert.ok(existsSync(join(target, "scripts", ".gitkeep")));
+		assert.ok(existsSync(join(target, "local", "tmp", ".gitkeep")));
+		assert.ok(existsSync(join(target, "local", "raw_data", ".gitkeep")));
+		assert.ok(existsSync(join(target, "tests", "smoke.test.ts")));
 
 		const packageJson = readFileSync(join(target, "package.json"), "utf8");
-		expect(packageJson).toContain("\"name\": \"smoke-test\"");
-		expect(packageJson).toContain("--config ./eslint.tooling.js");
+		assert.ok(packageJson.includes("\"name\": \"smoke-test\""));
+		assert.ok(packageJson.includes("--config ./eslint.tooling.js"));
+		assert.ok(packageJson.includes("\"node\": \">=22.18.0\""));
+		assert.ok(!packageJson.includes("bun"));
 
 		const gitignore = readFileSync(join(target, ".gitignore"), "utf8");
-		expect(gitignore).toContain("local/tmp/*");
-		expect(gitignore).not.toContain("{{localDir}}");
+		assert.ok(gitignore.includes("local/tmp/*"));
+		assert.ok(gitignore.includes("local/state/"));
+		assert.ok(!gitignore.includes("{{localDir}}"));
 	});
 
 	test("refuses an existing workspace without --force", () => {
 		const root = temporaryRoot();
 		const target = join(root, "workspace");
 		scaffold(target);
-		expect(() => scaffold(target)).toThrow(/already scaffolded/);
+		assert.throws(() => scaffold(target), /already scaffolded/);
 	});
 
 	test("overwrites template files with --force", () => {
@@ -78,7 +83,7 @@ describe("scaffold", () => {
 		const target = join(root, "workspace");
 		scaffold(target);
 		const result = scaffold(target, {}, true);
-		expect(result.files).toContain("package.json");
+		assert.ok(result.files.includes("package.json"));
 	});
 
 	test("honors custom directory names", () => {
@@ -86,26 +91,28 @@ describe("scaffold", () => {
 		const target = join(root, "workspace");
 		scaffold(target, { scriptsDirectory: "tools/scripts", localDirectory: "var/scratch" });
 
-		expect(existsSync(join(target, "tools", "scripts", ".gitkeep"))).toBe(true);
-		expect(existsSync(join(target, "var", "scratch", "tmp", ".gitkeep"))).toBe(true);
-		expect(existsSync(join(target, "scripts"))).toBe(false);
+		assert.ok(existsSync(join(target, "tools", "scripts", ".gitkeep")));
+		assert.ok(existsSync(join(target, "var", "scratch", "tmp", ".gitkeep")));
+		assert.ok(!existsSync(join(target, "scripts")));
 	});
 
 	test("requires the consent flag", () => {
 		const root = temporaryRoot();
 		const target = join(root, "workspace");
-		expect(() =>
-			runScaffold({
-				projectDir: target,
-				targetDir: target,
-				name: "smoke-test",
-				config: config(),
-				homeDir: target,
-				force: false,
-				install: false,
-				git: false,
-				yes: false,
-			}),
-		).toThrow(/--yes/);
+		assert.throws(
+			() =>
+				runScaffold({
+					projectDir: target,
+					targetDir: target,
+					name: "smoke-test",
+					config: config(),
+					homeDir: target,
+					force: false,
+					install: false,
+					git: false,
+					yes: false,
+				}),
+			/--yes/,
+		);
 	});
 });

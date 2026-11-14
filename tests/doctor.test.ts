@@ -1,10 +1,11 @@
-import { afterAll, describe, expect, test } from "bun:test";
+import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { after, describe, test } from "node:test";
+import type { Config } from "../plugins/script-forge/lib/config.ts";
 import { runDoctor } from "../plugins/script-forge/lib/doctor.ts";
 import { runScaffold } from "../plugins/script-forge/lib/scaffold.ts";
-import type { Config } from "../plugins/script-forge/lib/config.ts";
 
 const roots: string[] = [];
 
@@ -14,7 +15,7 @@ function temporaryRoot(): string {
 	return root;
 }
 
-afterAll(() => {
+after(() => {
 	for (const root of roots) {
 		rmSync(root, { recursive: true, force: true });
 	}
@@ -47,16 +48,16 @@ describe("doctor", () => {
 		});
 
 		const result = runDoctor({ projectDir: target, config: config(), homeDir: target });
-		expect(result.fails).toBe(0);
-		expect(result.passes).toBeGreaterThan(0);
-		expect(result.warns).toBeGreaterThan(0);
-		expect(result.checks.some((check) => check.message.includes("ESLint config reachable"))).toBe(true);
+		assert.equal(result.fails, 0);
+		assert.ok(result.passes > 0);
+		assert.ok(result.warns > 0);
+		assert.ok(result.checks.some((check) => check.message.includes("ESLint config reachable")));
 	});
 
 	test("fails when package.json is missing", () => {
 		const root = temporaryRoot();
 		const result = runDoctor({ projectDir: root, config: config(), homeDir: root });
-		expect(result.fails).toBeGreaterThan(0);
-		expect(result.checks.some((check) => check.level === "fail" && check.message.includes("package.json"))).toBe(true);
+		assert.ok(result.fails > 0);
+		assert.ok(result.checks.some((check) => check.level === "fail" && check.message.includes("package.json")));
 	});
 });

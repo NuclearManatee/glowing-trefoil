@@ -17,10 +17,11 @@ Before any file is written, tell the user exactly what will happen and get
 explicit confirmation:
 
 1. template files copied into the target directory (`package.json`,
-   `tsconfig.json`, `.gitignore`, `<scriptsDir>/`, `<localDir>/`);
+   `tsconfig.json`, `.gitignore`, `tests/smoke.test.ts`, `<scriptsDir>/`,
+   `<localDir>/`);
 2. `eslint.tooling.js` copied into the project (unless a custom
    `esLintConfigLocation` is configured);
-3. `bun install` (network; skipped when Bun is absent);
+3. `npm install` (network; skipped when npm is absent);
 4. `git init -b main` and, when a git identity is configured, a first commit.
 
 If the user declines, stop without writing anything.
@@ -44,7 +45,7 @@ Useful flags:
   install status, git status, warnings, and the doctor SUMMARY line.
 - Exit 1: user/input problem (for example the target is already scaffolded);
   report the message and ask before using `--force`.
-- Exit 2: environment problem (for example `bun install` failed); report the
+- Exit 2: environment problem (for example `npm install` failed); report the
   failing step and the exact command to retry.
 - Exit 3: an external command failed; report its output.
 - Exit 4: unexpected internal error; report it verbatim.

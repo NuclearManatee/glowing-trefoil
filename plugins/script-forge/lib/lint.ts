@@ -80,7 +80,7 @@ export function runLint(options: LintOptions): LintResult {
 	const eslintPath = join(options.projectDir, "node_modules", "eslint", "bin", "eslint.js");
 	if (!existsSync(eslintPath)) {
 		throw environmentError(
-			`ESLint is not installed in the project — run \`bun add -d ${ESLINT_DEV_DEPENDENCIES.join(" ")}\``,
+			`ESLint is not installed in the project — run \`npm install -D ${ESLINT_DEV_DEPENDENCIES.join(" ")}\``,
 		);
 	}
 

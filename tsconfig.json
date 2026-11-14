@@ -1,16 +1,25 @@
 {
 	"compilerOptions": {
-		"target": "esnext",
-		"module": "esnext",
-		"moduleResolution": "bundler",
-		"lib": ["esnext"],
-		"types": ["bun", "node"],
+		"target": "es2023",
+		"module": "nodenext",
+		"moduleResolution": "nodenext",
+		"lib": ["es2023"],
+		"types": ["node"],
 		"strict": true,
 		"noUncheckedIndexedAccess": true,
 		"noEmit": true,
 		"allowImportingTsExtensions": true,
+		"rewriteRelativeImportExtensions": true,
 		"erasableSyntaxOnly": true,
+		"verbatimModuleSyntax": true,
 		"skipLibCheck": true
 	},
-	"include": ["plugins/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts"]
+	"include": [
+		"plugins/script-forge/cli/**/*.ts",
+		"plugins/script-forge/lib/**/*.ts",
+		"plugins/script-forge/skills/**/*.ts",
+		"plugins/script-forge/templates/tests/**/*.ts",
+		"scripts/**/*.ts",
+		"tests/**/*.ts"
+	]
 }

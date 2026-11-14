@@ -173,6 +173,11 @@ export default [
 							message:
 								"External date libraries are prohibited; use native global `Temporal`.",
 						},
+						{
+							group: ["bun", "bun:*", "node:sqlite"],
+							message:
+								"Use Node standard APIs; Bun modules are unavailable and `node:sqlite` is experimental on Node 22.",
+						},
 					],
 				},
 			],
@@ -233,11 +238,61 @@ export default [
 					message:
 						"Do not read `.env` as a file. Use `process.env`.",
 				},
+
+				// TypeScript syntax that Node's type stripping cannot transform.
 				{
-					selector:
-						"CallExpression[callee.type='MemberExpression'][callee.object.name='Bun'][callee.property.name='file'][arguments.0.value='.env']",
+					selector: "TSEnumDeclaration",
 					message:
-						"Do not read `.env` as a file. Use `process.env`.",
+						"Use a const object plus a union type; Node's type stripping cannot transform enums.",
+				},
+				{
+					selector: "TSModuleDeclaration[kind='namespace']",
+					message:
+						"Avoid namespaces; use modules. Node's type stripping cannot transform namespaces with runtime code.",
+				},
+				{
+					selector: "TSParameterProperty",
+					message:
+						"Assign constructor parameters explicitly; Node's type stripping cannot transform parameter properties.",
+				},
+				{
+					selector: "TSImportEqualsDeclaration",
+					message:
+						"Use standard ESM imports; Node's type stripping cannot transform import aliases.",
+				},
+				{
+					selector: "Decorator",
+					message:
+						"Decorators are not supported by Node's type stripping.",
+				},
+
+				// Bun and other non-Node runtime APIs.
+				{
+					selector: "MemberExpression[object.name='Bun']",
+					message:
+						"Bun APIs are unavailable; use Node APIs.",
+				},
+				{
+					selector: "NewExpression[callee.name='HTMLRewriter']",
+					message:
+						"HTMLRewriter is unavailable in Node; use cheerio.",
+				},
+				{
+					selector: "ImportExpression[source.value=/^bun:/]",
+					message:
+						"Bun modules are unavailable; use Node standard APIs.",
+				},
+				{
+					selector: "ImportExpression[source.value='node:sqlite']",
+					message:
+						"`node:sqlite` is experimental on Node 22; use a JSON file or an analytical format.",
+				},
+
+				// Bun-only path helpers.
+				{
+					selector: "MemberExpression[object.type='MetaProperty'][property.name='dir']",
+					message:
+						"Use `import.meta.dirname`.",
 				},
 			],
 		},

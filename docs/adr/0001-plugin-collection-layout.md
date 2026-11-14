@@ -1,6 +1,6 @@
 # ADR 0001 — Plugin collection layout and per-harness installation
 
-Status: accepted
+Status: accepted (section 7 superseded by ADR 0002)
 Date: 2026-11-04
 Owner: NuclearManatee
 Related: `docs/plans/2026-11-03-glowing-trefoil-refactor.md`, `docs/plans/2026-11-04-install-dx-proposal.md`
@@ -79,6 +79,10 @@ Empty values fall through to the next layer. Claude `userConfig` defaults are re
 
 ### 7. Bun builds, Node runs
 
+> **Superseded by ADR 0002.** The repository, CLI build, tests, templates, and
+> generated workspaces now use Node 22.18+ and npm. The original text is kept
+> for history.
+
 Bun `1.3.14` is the development, test, and build runtime. The shipped CLI targets Node 22+ because Cowork and normal `npx` environments guarantee Node, not Bun. The CLI uses only Node APIs and array-based subprocess calls.
 
 ## Consequences
@@ -96,7 +100,7 @@ Negative / accepted costs:
 
 - An npm release is required for the short install/run commands. Before a release, the GitHub spec works but is long.
 - `npx` needs network access on first run.
-- The generated workspace is Bun-based; Cowork can scaffold it but cannot install or run it without Bun. Doctor reports this honestly.
+- The generated workspace is Bun-based; Cowork can scaffold it but cannot install or run it without Bun. *(Superseded by ADR 0002: generated workspaces now use Node 22.18+ and npm.)* Doctor reports this honestly.
 - Cursor Enterprise can disable local plugin imports; the marketplace path is the fallback.
 - Claude `userConfig` values are interpolated into a shell command, so values containing single quotes are unsupported.
 

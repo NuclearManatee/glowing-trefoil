@@ -24,7 +24,7 @@ defaults). They do not pass Claude `userConfig`.
 | `defaultNamespace` | `tools` | `<namespace>:<scriptname>` alias namespace used in `package.json` (see lifecycle.md → Proper scripts). |
 | `scaffoldDirectory` | empty = current working directory | Absolute path where the scaffold command creates new workspaces. |
 | `scriptsDirectory` | `scripts` | Workspace-relative directory where proper scripts live. |
-| `localDirectory` | `local` | Workspace-relative scratch root; the `tmp/` (temp-tools) and `raw_data/` (No Naked Data) children hang off it. |
+| `localDirectory` | `local` | Workspace-relative scratch root; the `tmp/` (temp-tools), `raw_data/` (No Naked Data), and `state/` (checkpoint files) children hang off it. |
 | `esLintConfigLocation` | empty = `<project>/eslint.tooling.js` | Absolute path to a custom ESLint flat config. Empty means use the project-local copy that scaffold writes. |
 
 ## Portable config
@@ -78,10 +78,10 @@ config dialog.
 
 ## What every path means
 
-Throughout this skill, `scripts/`, `local/tmp`, `local/raw_data`, and
-`scripts/<scriptname>/` mean the **configured** directories. The prose uses
-`<scriptsDir>`, `<localDir>`, and `<namespace>` placeholders. Code-block
-examples keep the default names so they stay copy-paste runnable.
+Throughout this skill, `scripts/`, `local/tmp`, `local/raw_data`,
+`local/state`, and `scripts/<scriptname>/` mean the **configured** directories.
+The prose uses `<scriptsDir>`, `<localDir>`, and `<namespace>` placeholders.
+Code-block examples keep the default names so they stay copy-paste runnable.
 
 ## LLM provider & model — asked at runtime
 

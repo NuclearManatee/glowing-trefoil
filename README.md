@@ -39,13 +39,13 @@ Claude Code and Cowork, `/script-forge-<name>` in Cursor and OpenCode:
 
 - `scaffold` — create a workspace once: templates, a project-local ESLint
   config, dependencies, optional `git init` and first commit.
-- `doctor` — Node/Bun runtime, `engines.bun` pin, dependencies, `.env`
+- `doctor` — Node runtime and `engines.node` minimum, dependencies, `.env`
   presence (never contents), folder layout, ESLint config, git state.
 - `lint` — run ESLint against the project-local config; `--fix` with consent.
 
-**Blank templates** — `package.json` (zod + the ESLint toolchain, `engines.bun`
-pin), `tsconfig.json`, `.gitignore`, and the `scripts/`, `local/tmp/`,
-`local/raw_data/` folders.
+**Blank templates** — `package.json` (zod + the ESLint toolchain, `engines.node`
+pin), `tsconfig.json`, `.gitignore`, a working `node:test` smoke test, and the
+`scripts/`, `local/tmp/`, `local/raw_data/` folders.
 
 ## Configuration
 
@@ -70,32 +70,31 @@ workspace. See [`plugins/script-forge/skills/anvil/references/config.md`](plugin
 
 ## Requirements
 
-- **Runtime:** Node 22+ (the CLI and every generated command).
-- **Workspaces:** Bun `1.3.14` (pinned by the generated `package.json`).
-- **Development:** Bun `1.3.14` for building, testing, and bundling.
+- **Runtime:** Node 22.18+ for the CLI and every generated workspace.
+- **Package manager:** npm (bundled with Node).
+- **Development:** Node 22.18+ for building, testing, and typechecking.
 
-Cowork has Node and npm but not guaranteed Bun. `scaffold` still creates the
-workspace and skips `bun install`, printing the exact command to run later;
-`doctor` reports the missing Bun as a failure because the generated workspace
-is Bun-based.
+Cowork's VM runs Node and npm; the plugin, the CLI, and generated workspaces all
+use that same runtime. `scaffold` runs `npm install` when npm is available and
+skips it with the exact retry command otherwise.
 
 ## Development
 
 ```sh
-bun install
-bun run lint
-bun run typecheck
-bun test
-bun run validate
-bun run build:commands
-bun run build
+npm install
+npm run lint
+npm run typecheck
+npm test
+npm run validate
+npm run build:commands
+npm run build
 ```
 
-- `bun run build:commands` regenerates the three command adapters from
+- `npm run build:commands` regenerates the three command adapters from
   `plugins/script-forge/commands-src/`. Generated files are committed; CI fails
   on drift.
-- `bun run build` bundles `dist/cli.js` for Node; it is gitignored and built by
-  `prepack`.
+- `npm run build` compiles `dist/cli/index.js` with `tsc`; it is gitignored and
+  built by `prepack`.
 - Layout rules and maintenance obligations: [`AGENTS.md`](AGENTS.md).
 
 ## Release history

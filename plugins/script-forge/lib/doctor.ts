@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { Config } from "./config.ts";
 import { normalizeSlashes, resolveEslintConfig, resolveWorkspaceDirs } from "./config.ts";
-import { BUN_PIN, bunVersion, versionMismatch } from "./runtime.ts";
+import { NODE_MIN, meetsMinimum, nodeVersion } from "./runtime.ts";
 
 export type DoctorLevel = "pass" | "warn" | "fail";
 
@@ -35,7 +35,7 @@ const DEV_DEPENDENCIES = [
 	"@stylistic/eslint-plugin",
 	"eslint-plugin-unicorn",
 	"typescript",
-	"@types/bun",
+	"@types/node",
 ] as const;
 
 function readJson(path: string): Record<string, unknown> | null {
@@ -104,19 +104,10 @@ export function runDoctor(options: DoctorOptions): DoctorResult {
 	const checks: DoctorCheck[] = [];
 	const { scriptsDir, localDir } = resolveWorkspaceDirs(options.config);
 
-	addCheck(checks, "pass", `Node runtime present (${process.versions.node})`);
-	const nodeMajor = Number(process.versions.node.split(".")[0] ?? "0");
-	if (nodeMajor < 22) {
-		addCheck(checks, "fail", `Node ${process.versions.node} is too old — the CLI requires Node 22 or later`);
-	}
-
-	const bun = bunVersion();
-	if (bun === null) {
-		addCheck(checks, "fail", `Bun ${BUN_PIN} not found — install it from https://bun.sh before running workspace scripts`);
-	} else if (versionMismatch(BUN_PIN, bun)) {
-		addCheck(checks, "warn", `Bun ${bun} does not match the pinned ${BUN_PIN}`);
-	} else {
-		addCheck(checks, "pass", `Bun ${bun} matches the pinned ${BUN_PIN}`);
+	const current = nodeVersion();
+	addCheck(checks, "pass", `Node runtime present (${current})`);
+	if (!meetsMinimum(current, NODE_MIN)) {
+		addCheck(checks, "fail", `Node ${current} is too old — the workspace requires Node ${NODE_MIN} or later`);
 	}
 
 	const packageJson = readJson(join(projectDir, "package.json"));
@@ -125,13 +116,13 @@ export function runDoctor(options: DoctorOptions): DoctorResult {
 	} else {
 		addCheck(checks, "pass", "package.json present and valid JSON");
 		const engines = recordValue(packageJson, "engines");
-		const enginesBun = engines === null ? undefined : stringValue(engines, "bun");
-		if (enginesBun === undefined) {
-			addCheck(checks, "warn", `package.json has no engines.bun pin — expected ${BUN_PIN}`);
-		} else if (versionMismatch(BUN_PIN, enginesBun)) {
-			addCheck(checks, "warn", `engines.bun "${enginesBun}" does not match the pinned ${BUN_PIN}`);
+		const enginesNode = engines === null ? undefined : stringValue(engines, "node");
+		if (enginesNode === undefined) {
+			addCheck(checks, "warn", `package.json has no engines.node pin — expected >=${NODE_MIN}`);
+		} else if (!meetsMinimum(enginesNode, NODE_MIN)) {
+			addCheck(checks, "warn", `engines.node "${enginesNode}" does not guarantee Node ${NODE_MIN} or later`);
 		} else {
-			addCheck(checks, "pass", `engines.bun pins ${enginesBun}`);
+			addCheck(checks, "pass", `engines.node allows Node ${NODE_MIN} or later (${enginesNode})`);
 		}
 	}
 
@@ -149,7 +140,7 @@ export function runDoctor(options: DoctorOptions): DoctorResult {
 			}
 			const version = installedVersion(projectDir, pkg);
 			if (version === null) {
-				addCheck(checks, "warn", `${pkg} declared but not installed — run \`bun install\``);
+				addCheck(checks, "warn", `${pkg} declared but not installed — run \`npm install\``);
 			} else {
 				addCheck(checks, "pass", `${pkg} installed (${version})`);
 			}
@@ -160,7 +151,7 @@ export function runDoctor(options: DoctorOptions): DoctorResult {
 	if (existsSync(join(projectDir, ".env"))) {
 		addCheck(checks, "pass", ".env present");
 	} else {
-		addCheck(checks, "warn", ".env not found — provide env vars via .env or the shell");
+		addCheck(checks, "warn", ".env not found — provide env vars via .env (loaded with --env-file-if-exists) or the shell");
 	}
 
 	for (const dir of [scriptsDir, join(localDir, "tmp"), join(localDir, "raw_data")]) {

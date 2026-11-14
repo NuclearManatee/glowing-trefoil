@@ -6,6 +6,34 @@ All notable changes to this collection are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Node TypeScript guardrails in the rulebook and `anvil` skill: erasable-syntax
+  rules, mandatory `.ts` import extensions, `import type`, and banned Bun APIs.
+- ESLint rules that reject `enum`, parameter properties, import aliases,
+  decorators, `Bun.*`, `bun:*`, `HTMLRewriter`, `import.meta.dir`, and
+  `node:sqlite`.
+- `tests/smoke.test.ts` in the workspace template so `npm test` is green before
+  the first script exists.
+- `tests/runner.test.ts`, covering resume, rollback, orphan confirmation,
+  corrupt state, and context serialization.
+
+### Changed
+
+- Runtime moved from Bun to **Node 22.18+** and npm. The CLI is compiled to
+  `dist/cli/index.js` with `tsc`; generated workspaces run `.ts` directly
+  through Node's type stripping.
+- Templates target NodeNext with `node --test`, `@types/node`, and
+  `engines.node >=22.18.0`.
+- The anvil checkpoint engine uses an atomic JSON state file instead of
+  `bun:sqlite`; `node:sqlite` is avoided because it is experimental on Node 22.
+- Rulebook, skill references, commands, README, install guide, and repository
+  agent guide rewritten for Node.
+
+### Removed
+
+- Bun runtime pin, `bun.lock`, `bun:test`, `bun:sqlite`, and `@types/bun`.
+
 ## [1.0.0] - 2026-11-14
 
 ### Added
